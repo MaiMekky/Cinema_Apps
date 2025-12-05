@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'pages/home/home_page.dart';
+import 'pages/auth/login_page.dart';
 
 class CineBookApp extends StatelessWidget {
   const CineBookApp({super.key});
@@ -10,7 +10,7 @@ class CineBookApp extends StatelessWidget {
       title: 'CineBook',
       debugShowCheckedModeBanner: false,
       theme: ThemeData.dark(),
-      home:  HomePage(),
+      home: const LoginPage(),
     );
   }
 }

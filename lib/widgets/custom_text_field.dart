@@ -2,25 +2,34 @@ import 'package:flutter/material.dart';
 import '../utils/app_colors.dart';
 
 class CustomTextField extends StatelessWidget {
-  final String hint;
+  final String label;
+  final TextEditingController controller;
+  final bool isPassword;
+  final String? Function(String?)? validator;
 
-  const CustomTextField({super.key, required this.hint});
+  const CustomTextField({
+    super.key,
+    required this.label,
+    required this.controller,
+    this.isPassword = false,
+    this.validator,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14),
-      decoration: BoxDecoration(
-        color: AppColors.card,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: TextField(
-        style: const TextStyle(color: Colors.white),
-        decoration: InputDecoration(
-          hintText: hint,
-          hintStyle: const TextStyle(color: AppColors.textSecondary),
-          border: InputBorder.none,
-          icon: const Icon(Icons.search, color: AppColors.textSecondary),
+    return TextFormField(
+      controller: controller,
+      obscureText: isPassword,
+      style: const TextStyle(color: Colors.white),
+      validator: validator,
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: const TextStyle(color: AppColors.textSecondary),
+        filled: true,
+        fillColor: AppColors.card,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide.none,
         ),
       ),
     );

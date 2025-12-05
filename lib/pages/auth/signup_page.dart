@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:your_app_name/pages/home/home_page.dart';
-import 'package:your_app_name/utils/app_colors.dart';
-import 'package:your_app_name/widgets/custom_text_field.dart';
-import 'package:your_app_name/services/auth_service.dart';
+import 'package:customer_app/pages/home/home_page.dart';
+import 'package:customer_app/utils/app_colors.dart';
+import 'package:customer_app/widgets/custom_text_field.dart';
+import 'package:customer_app/services/auth_service.dart';
+
 
 
 class SignupPage extends StatefulWidget {
@@ -139,7 +140,7 @@ class _SignupPageState extends State<SignupPage> {
                   child: ElevatedButton(
                     onPressed: isLoading ? null : registerUser,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
+                      backgroundColor: AppColors.textPrimary,
                       padding: const EdgeInsets.symmetric(vertical: 16),
                     ),
                     child: isLoading

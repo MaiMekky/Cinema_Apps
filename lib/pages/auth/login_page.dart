@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:customer_app/pages/home/home_page.dart';
 import 'signup_page.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -16,7 +17,12 @@ class _LoginPageState extends State<LoginPage> {
   final _formKey = GlobalKey<FormState>();
 
   bool isLoading = false;
-
+Future<void> saveUserToFirestore(User user) async {
+  await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+    'fullName': user.displayName ?? "User",
+    'email': user.email,
+  }, SetOptions(merge: true));
+}
   Future<void> loginUser() async {
     if (!_formKey.currentState!.validate()) return;
 

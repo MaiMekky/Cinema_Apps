@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../services/movies_service.dart';
 import '../../models/movie.dart';
 import '../../utils/app_colors.dart';
 import 'movie_card.dart';
+import '../auth/login_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -14,12 +17,26 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   List<Movie> movies = [];
   List<Movie> filtered = [];
+  String userName = "User";
 
   @override
   void initState() {
     super.initState();
     movies = MoviesService.getMovies();
     filtered = movies;
+    loadUserName();
+  }
+
+  Future<void> loadUserName() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+
+    final data =
+        await FirebaseFirestore.instance.collection('users').doc(uid).get();
+
+    setState(() {
+      userName = data.data()?['fullName'] ?? "User";
+    });
   }
 
   void search(String value) {
@@ -42,18 +59,18 @@ class _HomePageState extends State<HomePage> {
             children: [
               const SizedBox(height: 20),
 
-              // Top Bar
+              // HEADER BAR
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Row(
-                    children: const [
-                      Icon(Icons.movie, color: Colors.red, size: 28),
-                      SizedBox(width: 10),
+                    children: [
+                      const Icon(Icons.movie, color: Colors.red, size: 28),
+                      const SizedBox(width: 10),
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
+                          const Text(
                             "CineBook",
                             style: TextStyle(
                               color: AppColors.textPrimary,
@@ -62,8 +79,8 @@ class _HomePageState extends State<HomePage> {
                             ),
                           ),
                           Text(
-                            "Welcome, mai",
-                            style: TextStyle(
+                            "Welcome, $userName",
+                            style: const TextStyle(
                               color: AppColors.textSecondary,
                               fontSize: 14,
                             ),
@@ -72,13 +89,38 @@ class _HomePageState extends State<HomePage> {
                       ),
                     ],
                   ),
-                  const Icon(Icons.logout, color: AppColors.textSecondary),
+
+                  // LOGOUT
+              GestureDetector(
+                onTap: () async {
+                  try {
+                    await FirebaseAuth.instance.signOut();
+                    if (context.mounted) {
+                      Navigator.of(context).pushAndRemoveUntil(
+                        MaterialPageRoute(builder: (context) => const LoginPage()),
+                        (route) => false,
+                      );
+                    }
+                  } catch (e) {
+                    print("Logout error: $e");
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text("Logout failed: $e")),
+                      );
+                    }
+                  }
+                },
+                child: const Icon(
+                  Icons.logout,
+                  color: AppColors.textSecondary,
+                ),
+              ),
                 ],
               ),
 
               const SizedBox(height: 20),
 
-              // Search Bar
+              // SEARCH BAR
               TextField(
                 onChanged: search,
                 style: const TextStyle(color: Colors.white),
@@ -109,16 +151,14 @@ class _HomePageState extends State<HomePage> {
 
               const SizedBox(height: 10),
 
-              // Movie List
               Expanded(
                 child: ListView.builder(
                   itemCount: filtered.length,
                   itemBuilder: (context, index) {
-                    final movie = filtered[index];
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 10),
                       child: MovieCard(
-                        movie: movie,
+                        movie: filtered[index],
                         onBook: () {},
                       ),
                     );

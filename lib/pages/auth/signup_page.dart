@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:customer_app/pages/home/home_page.dart';
-import 'package:customer_app/widgets/custom_text_field.dart';
+// import 'package:customer_app/widgets/custom_text_field.dart';
 import 'package:customer_app/services/auth_service.dart';
-
+import 'package:cloud_firestore/cloud_firestore.dart';
 class SignupPage extends StatefulWidget {
   const SignupPage({super.key});
 
   @override
   State<SignupPage> createState() => _SignupPageState();
 }
-
+@override
 class _SignupPageState extends State<SignupPage> {
   final nameController = TextEditingController();
   final emailController = TextEditingController();
@@ -19,7 +19,12 @@ class _SignupPageState extends State<SignupPage> {
 
   final _formKey = GlobalKey<FormState>();
   bool isLoading = false;
-
+Future<void> saveUserToFirestore(User user) async {
+  await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+    'fullName': user.displayName ?? "User",
+    'email': user.email,
+  }, SetOptions(merge: true));
+}
   Future<void> registerUser() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -267,81 +272,81 @@ class _SignupPageState extends State<SignupPage> {
       ),
     );
   }
+ Widget _buildTextField({
+  required String label,
+  required String hint,
+  required TextEditingController controller,
+  bool isPassword = false,
+  String? Function(String?)? validator,
+}) {
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(
+        label,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 14,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+      const SizedBox(height: 8),
 
-  Widget _buildTextField({
-    required String label,
-    required String hint,
-    required TextEditingController controller,
-    bool isPassword = false,
-    String? Function(String?)? validator,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            color: Colors.white,
+      TextFormField(
+        controller: controller,
+        obscureText: isPassword,
+        validator: validator,
+        style: const TextStyle(color: Colors.white),
+
+        decoration: InputDecoration(
+          hintText: hint,
+          hintStyle: const TextStyle(
+            color: Color(0xFF4A5568),
             fontSize: 14,
-            fontWeight: FontWeight.w500,
           ),
-        ),
-        const SizedBox(height: 8),
-        TextFormField(
-          controller: controller,
-          obscureText: isPassword,
-          validator: validator,
-          style: const TextStyle(color: Colors.white),
-          decoration: InputDecoration(
-            hintText: hint,
-            hintStyle: const TextStyle(
-              color: Color(0xFF4A5568),
-              fontSize: 14,
-            ),
-            filled: true,
-            fillColor: const Color(0xFF0F1B2B),
-            border: OutlineInput Border(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(
-                color: Color(0xFF2D3748),
-                width: 1,
-              ),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(
-                color: Color(0xFF2D3748),
-                width: 1,
-              ),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(
-                color: Color(0xFFE50914),
-                width: 1.5,
-              ),
-            ),
-            errorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(
-                color: Colors.redAccent,
-                width: 1,
-              ),
-            ),
-            focusedErrorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(
-                color: Colors.redAccent,
-                width: 1.5,
-              ),
-            ),
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 14,
+
+          filled: true,
+          fillColor: const Color(0xFF0F1B2B),
+
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: const BorderSide(
+              color: Color(0xFF2D3748),
+              width: 1,
             ),
           ),
+
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: const BorderSide(
+              color: Color(0xFFE50914),
+              width: 1.5,
+            ),
+          ),
+
+          errorBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: const BorderSide(
+              color: Colors.redAccent,
+              width: 1,
+            ),
+          ),
+
+          focusedErrorBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: const BorderSide(
+              color: Colors.redAccent,
+              width: 1.5,
+            ),
+          ),
+
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 14,
+          ),
         ),
-      ],
-    );
-  }
+      ),
+    ],
+  );
+}
 }

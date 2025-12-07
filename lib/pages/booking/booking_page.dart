@@ -15,6 +15,7 @@ class BookingPage extends StatefulWidget {
   State<BookingPage> createState() => _BookingPageState();
 }
 
+
 class _BookingPageState extends State<BookingPage> {
   Movie? _movie;
   List<Screening> _screenings = [];
@@ -400,6 +401,7 @@ class _BookingPageState extends State<BookingPage> {
           return Padding(
             padding: const EdgeInsets.only(bottom: 16),
             child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
                   rowLetter,

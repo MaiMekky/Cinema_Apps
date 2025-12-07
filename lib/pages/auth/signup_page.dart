@@ -25,42 +25,52 @@ Future<void> saveUserToFirestore(User user) async {
     'email': user.email,
   }, SetOptions(merge: true));
 }
-  Future<void> registerUser() async {
-    if (!_formKey.currentState!.validate()) return;
+Future<void> registerUser() async {
+  if (!_formKey.currentState!.validate()) return;
 
-    setState(() => isLoading = true);
+  setState(() => isLoading = true);
 
-    try {
-      final auth = AuthService();
+  try {
+    final auth = AuthService();
 
-      await auth.signup(
-        name: nameController.text.trim(),
-        email: emailController.text.trim(),
-        password: passwordController.text.trim(),
+    await auth.signup(
+      name: nameController.text.trim(),
+      email: emailController.text.trim(),
+      password: passwordController.text.trim(),
+    );
+
+    // Show success message
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Account created successfully! Please log in."),
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 3),
+        ),
       );
 
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const HomePage()),
-      );
-    } on FirebaseAuthException catch (e) {
-      String errorMsg = "";
+      // Navigate back to login page
+      Navigator.pop(context);
+    }
+  } on FirebaseAuthException catch (e) {
+    String errorMsg = "";
 
-      if (e.code == "email-already-in-use") {
-        errorMsg = "This email is already registered.";
-      } else if (e.code == "weak-password") {
-        errorMsg = "Password is too weak.";
-      } else {
-        errorMsg = e.message ?? "Registration failed.";
-      }
+    if (e.code == "email-already-in-use") {
+      errorMsg = "This email is already registered.";
+    } else if (e.code == "weak-password") {
+      errorMsg = "Password is too weak.";
+    } else {
+      errorMsg = e.message ?? "Registration failed.";
+    }
 
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(errorMsg)));
-    } finally {
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(errorMsg)));
+  } finally {
+    if (mounted) {
       setState(() => isLoading = false);
     }
   }
-
+}
   @override
   Widget build(BuildContext context) {
     return Scaffold(

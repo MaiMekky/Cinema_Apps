@@ -29,7 +29,7 @@ class MovieCard extends StatelessWidget {
               topRight: Radius.circular(16),
             ),
             child: Image.network(
-              movie.imageUrl,
+              movie.posterUrl,
               height: 170,
               width: double.infinity,
               fit: BoxFit.cover,

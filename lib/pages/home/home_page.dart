@@ -6,6 +6,7 @@ import '../../models/movie.dart';
 import '../../utils/app_colors.dart';
 import 'movie_card.dart';
 import '../auth/login_page.dart';
+import '../booking/booking_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -159,7 +160,14 @@ class _HomePageState extends State<HomePage> {
                       padding: const EdgeInsets.only(bottom: 10),
                       child: MovieCard(
                         movie: filtered[index],
-                        onBook: () {},
+                        onBook: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => BookingPage(movieId: filtered[index].id),
+                            ),
+                          );
+                        },
                       ),
                     );
                   },

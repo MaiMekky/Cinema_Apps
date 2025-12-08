@@ -1,3 +1,4 @@
+import 'package:cinema_apps/screens/add_movie_screen.dart';
 import 'package:cinema_apps/screens/booking_overview_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
@@ -5,6 +6,7 @@ import '../models/movie.dart';
 import '../widgets/movie_card.dart';
 import 'movie_form_screen.dart';
 import '../utils/app_colors.dart';
+
 
 class VendorDashboardScreen extends StatefulWidget {
   const VendorDashboardScreen({super.key});
@@ -33,16 +35,17 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
     ),
   ];
 
-  void openAddForm() async {
-    final result = await Navigator.push(
-      context,
-     MaterialPageRoute(builder: (_) => MovieFormScreen()),
-    );
+void openAddForm() async {
+  final result = await Navigator.push(
+    context,
+    MaterialPageRoute(builder: (_) => AddMovieScreen()),
+  );
 
-    if (result is Movie) {
-      setState(() => movies.add(result));
-    }
+  if (result is Movie) {
+    setState(() => movies.add(result));
   }
+}
+
 
   void openEditForm(Movie movie) async {
     final result = await Navigator.push(

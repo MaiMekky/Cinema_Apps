@@ -41,13 +41,11 @@ class _BookingOverviewScreenState extends State<BookingOverviewScreen> {
         elevation: 0,
         title: const Text("Booking Overview"),
       ),
-
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
-
-            // TOP CARD ----------------------------------------------
+            // TOP CARD ----------------------------
             Container(
               padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
@@ -57,8 +55,6 @@ class _BookingOverviewScreenState extends State<BookingOverviewScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-
-                  // Movie name
                   Text(
                     widget.movie.title,
                     style: const TextStyle(
@@ -67,32 +63,20 @@ class _BookingOverviewScreenState extends State<BookingOverviewScreen> {
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-
                   const SizedBox(height: 4),
-                  const Text("Booking Overview",
-                      style: TextStyle(color: Colors.white60)),
-
+                  const Text("Booking Overview", style: TextStyle(color: Colors.white60)),
                   const SizedBox(height: 16),
-
-                  // FIXED-SIZE IMAGE (NO STRETCHING)
                   ClipRRect(
                     borderRadius: BorderRadius.circular(12),
                     child: SizedBox(
                       height: 160,
                       width: double.infinity,
-                      child: Image.network(
-                        widget.movie.imageUrl,
-                        fit: BoxFit.cover,
-                      ),
+                      child: Image.network(widget.movie.imageUrl, fit: BoxFit.cover),
                     ),
                   ),
-
                   const SizedBox(height: 20),
-                  const Text("Select Time Slot",
-                      style: TextStyle(color: Colors.white70)),
+                  const Text("Select Time Slot", style: TextStyle(color: Colors.white70)),
                   const SizedBox(height: 10),
-
-                  // Time Slots
                   Wrap(
                     spacing: 10,
                     runSpacing: 10,
@@ -101,56 +85,38 @@ class _BookingOverviewScreenState extends State<BookingOverviewScreen> {
                       return GestureDetector(
                         onTap: () => setState(() => selectedSlot = slot),
                         child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 20, vertical: 12),
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                           decoration: BoxDecoration(
-                            color: isSelected
-                                ? AppColors.primary
-                                : Colors.grey[700],
+                            color: isSelected ? AppColors.primary : Colors.grey[700],
                             borderRadius: BorderRadius.circular(10),
                           ),
-                          child: Text(
-                            slot,
-                            style: const TextStyle(
-                                color: Colors.white, fontSize: 14),
-                          ),
+                          child: Text(slot, style: const TextStyle(color: Colors.white)),
                         ),
                       );
                     }).toList(),
                   ),
-
                   const SizedBox(height: 20),
-
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text("Booked Seats:",
-                          style: TextStyle(color: Colors.white70)),
-                      Text("$booked / $totalSeats",
-                          style: const TextStyle(
-                              color: Colors.redAccent, fontSize: 16)),
+                      const Text("Booked Seats:", style: TextStyle(color: Colors.white70)),
+                      Text("$booked / $totalSeats", style: const TextStyle(color: Colors.redAccent, fontSize: 16)),
                     ],
                   ),
-
                   const SizedBox(height: 8),
-
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text("Available Seats:",
-                          style: TextStyle(color: Colors.white70)),
-                      Text("$available",
-                          style: const TextStyle(
-                              color: Colors.greenAccent, fontSize: 16)),
+                      const Text("Available Seats:", style: TextStyle(color: Colors.white70)),
+                      Text("$available", style: const TextStyle(color: Colors.greenAccent, fontSize: 16)),
                     ],
                   ),
                 ],
               ),
             ),
-
             const SizedBox(height: 24),
 
-            // SEAT LAYOUT CARD -------------------------------------
+            // SEAT LAYOUT CARD ---------------------
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
@@ -159,55 +125,43 @@ class _BookingOverviewScreenState extends State<BookingOverviewScreen> {
               ),
               child: Column(
                 children: [
-                  Text(
-                    "Seat Layout - $selectedSlot",
-                    style: const TextStyle(color: Colors.white70),
-                  ),
+                  Text("Seat Layout - $selectedSlot", style: const TextStyle(color: Colors.white70)),
                   const SizedBox(height: 16),
 
                   // SCREEN BANNER
                   Container(
-                    height: 35,
-                    margin: const EdgeInsets.symmetric(horizontal: 40),
+                    height: 40,
+                    margin: const EdgeInsets.symmetric(horizontal: 20),
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(6),
                       gradient: LinearGradient(
                         colors: [
                           Colors.transparent,
                           Colors.white.withOpacity(0.3),
-                          Colors.white.withOpacity(0.6),
+                          Colors.white.withOpacity(0.5),
                           Colors.white.withOpacity(0.3),
                           Colors.transparent,
                         ],
+                        stops: const [0.0, 0.3, 0.5, 0.7, 1.0],
                       ),
+                      borderRadius: BorderRadius.circular(4),
                     ),
                     child: Center(
                       child: Text(
-                        "S C R E E N",
+                        'S C R E E N',
                         style: TextStyle(
                           color: Colors.white.withOpacity(0.9),
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
                           letterSpacing: 4,
                         ),
                       ),
                     ),
                   ),
-
-                  const SizedBox(height: 30),
-
-                  // SEATS (CUSTOM ROW LAYOUT LIKE CUSTOMER APP)
+                  const SizedBox(height: 40),
                   buildSeatLayout(),
-
-                  const SizedBox(height: 24),
-
-                  // LEGEND
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: const [
-                      SeatLegend(color: Colors.grey, label: "Available"),
-                      SizedBox(width: 24),
-                      SeatLegend(color: Colors.redAccent, label: "Booked"),
-                    ],
-                  ),
+                  const SizedBox(height: 32),
+                  _buildLegend(),
+                  const SizedBox(height: 40),
                 ],
               ),
             ),
@@ -218,25 +172,35 @@ class _BookingOverviewScreenState extends State<BookingOverviewScreen> {
   }
 
   // =============================================================
-  // FINAL PERFECT SEAT LAYOUT (same style as customer version)
+  // Total = 47
   // =============================================================
   Widget buildSeatLayout() {
-    final rows = ["A", "B", "C", "D", "E", "F"];
-    final seatsPerRow = [8, 8, 8, 8, 8, 7]; // total = 47
+    final rows = ["A", "B", "C", "D", "H"];
+
+    // EXACT CUSTOMER LAYOUT
+    final seatsPerRow = {
+      "A": 9, // 4 + 5
+      "B": 9,
+      "C": 9,
+      "D": 9,
+      "H": 11, // last row, no gap
+    };
 
     int index = 0;
 
-    return Column(
-      children: [
-        for (int r = 0; r < rows.length; r++)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
+    return Center(
+      child: Column(
+        children: rows.map((rowLetter) {
+          final seatCount = seatsPerRow[rowLetter]!;
+          final isLastRow = rowLetter == "H";
+
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 16),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // Row label
                 Text(
-                  rows[r],
+                  rowLetter,
                   style: const TextStyle(
                     color: Colors.white70,
                     fontSize: 16,
@@ -244,72 +208,96 @@ class _BookingOverviewScreenState extends State<BookingOverviewScreen> {
                   ),
                 ),
                 const SizedBox(width: 10),
-
-                // Seats in this row
                 Row(
-                  children: List.generate(seatsPerRow[r], (seatIndex) {
-                    // String seatId = "${rows[r]}${seatIndex + 1}";
-                    bool booked = seatStatus[index];
+                  children: List.generate(
+                    seatCount + (isLastRow ? 0 : 2), // +2 for gap positions
+                    (i) {
+                      // GAP after 4th seat (positions 4 and 5)
+                      if (!isLastRow && (i == 4 || i == 5)) {
+                        return const SizedBox(width: 29);
+                      }
 
-                    Widget seatWidget = GestureDetector(
-                      onTap: () => toggleSeat(index),
-                      child: Container(
-                        width: 26,
-                        height: 26,
-                        margin: const EdgeInsets.symmetric(horizontal: 4),
-                        decoration: BoxDecoration(
-                          color: booked
-                              ? Colors.redAccent
-                              : Colors.grey[700],
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(
-                            color: booked
-                                ? Colors.red
-                                : Colors.white24,
-                            width: 1,
+                      int seatNum = i;
+                      if (!isLastRow && i >= 6) {
+                        seatNum -= 2;
+                      }
+
+                      if (seatNum >= seatCount) return const SizedBox.shrink();
+
+                      bool isBooked = seatStatus[index];
+
+                      final widget = GestureDetector(
+                        onTap: () => toggleSeat(index),
+                        child: Container(
+                          width: 25,
+                          height: 25,
+                          margin: const EdgeInsets.symmetric(horizontal: 2),
+                          decoration: BoxDecoration(
+                            color: isBooked ? Colors.redAccent : AppColors.card,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: isBooked ? Colors.redAccent : Colors.white24,
+                              width: 1,
+                            ),
+                          ),
+                          child: Center(
+                            child: Text(
+                              "${seatNum + 1}",
+                              style: TextStyle(
+                                color: isBooked ? Colors.white : Colors.white70,
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                           ),
                         ),
-                        child: const Icon(
-                          Icons.event_seat,
-                          size: 16,
-                          color: Colors.white,
-                        ),
-                      ),
-                    );
+                      );
 
-                    index++;
-                    return seatWidget;
-                  }),
+                      index++;
+                      return widget;
+                    },
+                  ),
                 ),
               ],
             ),
-          ),
-      ],
+          );
+        }).toList(),
+      ),
     );
   }
-}
 
-// LEGEND ---------------------------------------------------------
-class SeatLegend extends StatelessWidget {
-  final Color color;
-  final String label;
-
-  const SeatLegend({super.key, required this.color, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildLegend() {
     return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: [
-        Container(
-          width: 14,
-          height: 14,
-          decoration: BoxDecoration(
-            color: color,
-            borderRadius: BorderRadius.circular(3),
-          ),
+        Row(
+          children: [
+            Container(
+              width: 20,
+              height: 20,
+              decoration: BoxDecoration(
+                color: AppColors.card,
+                borderRadius: BorderRadius.circular(4),
+              ),
+            ),
+            const SizedBox(width: 8),
+            const Text('Available', style: TextStyle(color: Colors.white70)),
+          ],
         ),
-        const SizedBox(width: 6),
-        Text(label, style: const TextStyle(color: Colors.white70)),
+        Row(
+          children: [
+            Container(
+              width: 20,
+              height: 20,
+              decoration: BoxDecoration(
+                color: Colors.redAccent,
+                borderRadius: BorderRadius.circular(4),
+              ),
+            ),
+            const SizedBox(width: 8),
+            const Text('Booked', style: TextStyle(color: Colors.white70)),
+          ],
+        ),
       ],
     );
   }

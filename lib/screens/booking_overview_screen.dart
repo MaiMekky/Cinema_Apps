@@ -175,96 +175,98 @@ class _BookingOverviewScreenState extends State<BookingOverviewScreen> {
   // Total = 47
   // =============================================================
   Widget buildSeatLayout() {
-    final rows = ["A", "B", "C", "D", "H"];
+  final rows = ["A", "B", "C", "D", "H"];
 
-    // EXACT CUSTOMER LAYOUT
-    final seatsPerRow = {
-      "A": 9, // 4 + 5
-      "B": 9,
-      "C": 9,
-      "D": 9,
-      "H": 11, // last row, no gap
-    };
+  // Seats per row
+  final seatsPerRow = {
+    "A": 9, 
+    "B": 9,
+    "C": 9,
+    "D": 9,
+    "H": 11, 
+  };
 
-    int index = 0;
+  int index = 0;
 
-    return Center(
-      child: Column(
-        children: rows.map((rowLetter) {
-          final seatCount = seatsPerRow[rowLetter]!;
-          final isLastRow = rowLetter == "H";
+  return Column(
+    children: rows.map((rowLetter) {
+      final seatCount = seatsPerRow[rowLetter]!;
+      final isLastRow = rowLetter == "H";
 
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 16),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  rowLetter,
-                  style: const TextStyle(
-                    color: Colors.white70,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Row(
-                  children: List.generate(
-                    seatCount + (isLastRow ? 0 : 2), // +2 for gap positions
-                    (i) {
-                      // GAP after 4th seat (positions 4 and 5)
-                      if (!isLastRow && (i == 4 || i == 5)) {
-                        return const SizedBox(width: 29);
-                      }
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 16),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              rowLetter,
+              style: const TextStyle(
+                color: Colors.white70,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: List.generate(seatCount + (isLastRow ? 0 : 2), (i) {
+                    // Add aisle spacing for rows except last
+                    if (!isLastRow && (i == 4 || i == 5)) {
+                      return const SizedBox(width: 12);
+                    }
 
-                      int seatNum = i;
-                      if (!isLastRow && i >= 6) {
-                        seatNum -= 2;
-                      }
+                    int seatNum = i;
+                    if (!isLastRow && i >= 6) seatNum -= 2;
+                    if (seatNum >= seatCount) return const SizedBox.shrink();
 
-                      if (seatNum >= seatCount) return const SizedBox.shrink();
+                    // Safety check to avoid index out of range
+                    if (index >= seatStatus.length) return const SizedBox.shrink();
 
-                      bool isBooked = seatStatus[index];
+                    bool isBooked = seatStatus[index];
 
-                      final widget = GestureDetector(
-                        onTap: () => toggleSeat(index),
-                        child: Container(
-                          width: 25,
-                          height: 25,
-                          margin: const EdgeInsets.symmetric(horizontal: 2),
-                          decoration: BoxDecoration(
-                            color: isBooked ? Colors.redAccent : AppColors.card,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                              color: isBooked ? Colors.redAccent : Colors.white24,
-                              width: 1,
-                            ),
+                    final seatWidget = GestureDetector(
+                      onTap: () => toggleSeat(index),
+                      child: Container(
+                        width: 25,
+                        height: 25,
+                        margin: const EdgeInsets.symmetric(horizontal: 2),
+                        decoration: BoxDecoration(
+                          color: isBooked ? Colors.redAccent : AppColors.card,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: isBooked ? Colors.redAccent : Colors.white24,
+                            width: 1,
                           ),
-                          child: Center(
-                            child: Text(
-                              "${seatNum + 1}",
-                              style: TextStyle(
-                                color: isBooked ? Colors.white : Colors.white70,
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                              ),
+                        ),
+                        child: Center(
+                          child: Text(
+                            "${seatNum + 1}",
+                            style: TextStyle(
+                              color: isBooked ? Colors.white : Colors.white70,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
                             ),
                           ),
                         ),
-                      );
+                      ),
+                    );
 
-                      index++;
-                      return widget;
-                    },
-                  ),
+                    index++;
+                    return seatWidget;
+                  }),
                 ),
-              ],
+              ),
             ),
-          );
-        }).toList(),
-      ),
-    );
-  }
+          ],
+        ),
+      );
+    }).toList(),
+  );
+}
+
 
   Widget _buildLegend() {
     return Row(

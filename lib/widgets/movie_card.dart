@@ -18,78 +18,170 @@ class MovieCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      color: AppColors.card,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isSmallScreen = screenWidth < 380;
+    final isMediumScreen = screenWidth < 600;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(16),
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(isSmallScreen ? 12 : 16),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Movie Image
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
               child: Image.network(
                 movie.imageUrl,
-                width: 110,
-                height: 140,
+                width: isSmallScreen ? 100 : (isMediumScreen ? 120 : 140),
+                height: isSmallScreen ? 160 : (isMediumScreen ? 180 : 200),
                 fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) {
+                  return Container(
+                    width: isSmallScreen ? 100 : (isMediumScreen ? 120 : 140),
+                    height: isSmallScreen ? 140 : (isMediumScreen ? 160 : 180),
+                    color: AppColors.background,
+                    child: Icon(
+                      Icons.movie,
+                      color: AppColors.textSecondary,
+                      size: isSmallScreen ? 40 : 50,
+                    ),
+                  );
+                },
               ),
             ),
-            const SizedBox(width: 20),
+            SizedBox(width: isSmallScreen ? 12 : 16),
+            // Movie Details
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Title
                   Text(
                     movie.title,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
+                    style: TextStyle(
                       color: AppColors.textPrimary,
+                      fontSize: isSmallScreen ? 16 : 18,
+                      fontWeight: FontWeight.w600,
                     ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    movie.description,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: AppColors.textSecondary),
                   ),
-                  const SizedBox(height: 12),
+                  SizedBox(height: isSmallScreen ? 6 : 8),
+                  // Description
+                  Text(
+                    movie.description,
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: isSmallScreen ? 12 : 14,
+                      height: 1.4,
+                    ),
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  SizedBox(height: isSmallScreen ? 8 : 12),
+                  // Duration and Slots
                   Row(
                     children: [
-                      const Icon(Icons.timer, size: 16, color: AppColors.textSecondary),
-                      const SizedBox(width: 6),
-                      Text("${movie.duration} min"),
-                      const SizedBox(width: 20),
-                      const Icon(Icons.calendar_today, size: 16, color: AppColors.textSecondary),
-                      const SizedBox(width: 6),
-                      Text("${movie.timeSlots.length} slots"),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: onView,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primary,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                          ),
-                          child: const Text("👁 View"),
+                      Icon(
+                        Icons.access_time,
+                        color: AppColors.textSecondary,
+                        size: isSmallScreen ? 14 : 16,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        "${movie.duration} min",
+                        style: TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: isSmallScreen ? 11 : 13,
                         ),
                       ),
-                      const SizedBox(width: 10),
-                      IconButton(
-                        icon: const Icon(Icons.edit),
-                        onPressed: onEdit,
+                      SizedBox(width: isSmallScreen ? 12 : 16),
+                      Icon(
+                        Icons.calendar_today,
+                        color: AppColors.textSecondary,
+                        size: isSmallScreen ? 14 : 16,
                       ),
+                      const SizedBox(width: 4),
+                      Text(
+                        "${movie.timeSlots.length} slots",
+                        style: TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: isSmallScreen ? 11 : 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: isSmallScreen ? 12 : 16),
+                  // Action Buttons
+                  Row(
+                    children: [
+                      // View Button
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: onView,
+                          icon: Icon(
+                            Icons.remove_red_eye,
+                            size: isSmallScreen ? 16 : 18,
+                            color: Colors.white,
+                          ),
+                          label: Text(
+                            "View",
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: isSmallScreen ? 13 : 15,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            padding: EdgeInsets.symmetric(
+                              vertical: isSmallScreen ? 10 : 12,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            elevation: 0,
+                          ),
+                        ),
+                      ),
+                      SizedBox(width: isSmallScreen ? 6 : 8),
+                      // Edit Button
                       IconButton(
-                        icon: const Icon(Icons.delete, color: Colors.redAccent),
+                        onPressed: onEdit,
+                        icon: const Icon(Icons.edit),
+                        color: AppColors.textSecondary,
+                        iconSize: isSmallScreen ? 18 : 20,
+                        style: IconButton.styleFrom(
+                          backgroundColor: AppColors.buttonBackground,
+                          padding: EdgeInsets.all(isSmallScreen ? 10 : 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          minimumSize: const Size(0, 0),
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                      ),
+                      SizedBox(width: isSmallScreen ? 6 : 8),
+                      // Delete Button
+                      IconButton(
                         onPressed: onDelete,
+                        icon: const Icon(Icons.delete),
+                        color: AppColors.textSecondary,
+                        iconSize: isSmallScreen ? 18 : 20,
+                        style: IconButton.styleFrom(
+                          backgroundColor: AppColors.buttonBackground,
+                          padding: EdgeInsets.all(isSmallScreen ? 10 : 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          minimumSize: const Size(0, 0),
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
                       ),
                     ],
                   ),

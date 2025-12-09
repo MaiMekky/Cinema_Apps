@@ -28,12 +28,6 @@ class _AddMovieScreenState extends State<AddMovieScreen> {
     if (img != null) setState(() => selectedImage = File(img.path));
   }
 
-  // ------------------- Take Photo (Camera) -------------------
-  Future pickFromCamera() async {
-    final img = await ImagePicker().pickImage(source: ImageSource.camera, imageQuality: 85);
-
-    if (img != null) setState(() => selectedImage = File(img.path));
-  }
 
   // --------------------------- SAVE ---------------------------
   saveMovie(){
@@ -83,8 +77,7 @@ class _AddMovieScreenState extends State<AddMovieScreen> {
               Row(
                 children: [
                   Expanded(child: imageButton("Upload Image",Icons.upload,pickFromGallery)),
-                  const SizedBox(width:12),
-                  Expanded(child: imageButton("Take Photo",Icons.camera_alt,pickFromCamera)),
+                  const SizedBox(width:12)
                 ],
               ),
 

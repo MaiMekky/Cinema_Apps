@@ -6,14 +6,13 @@ import '../utils/app_colors.dart';
 class MovieCard extends StatelessWidget {
   final MovieModel movie;
   final VoidCallback onView;
-  final VoidCallback onEdit;
+
   final VoidCallback onDelete;
 
   const MovieCard({
     super.key,
     required this.movie,
     required this.onView,
-    required this.onEdit,
     required this.onDelete,
   });
 
@@ -150,23 +149,9 @@ class MovieCard extends StatelessWidget {
                           ),
                         ),
                       ),
-                      SizedBox(width: isSmallScreen ? 6 : 8),
-                      // Edit Button
-                      IconButton(
-                        onPressed: onEdit,
-                        icon: const Icon(Icons.edit),
-                        color: AppColors.textSecondary,
-                        iconSize: isSmallScreen ? 18 : 20,
-                        style: IconButton.styleFrom(
-                          backgroundColor: AppColors.buttonBackground,
-                          padding: EdgeInsets.all(isSmallScreen ? 10 : 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          minimumSize: const Size(0, 0),
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        ),
-                      ),
+                      // SizedBox(width: isSmallScreen ? 6 : 8),
+
+              
                       SizedBox(width: isSmallScreen ? 6 : 8),
                       // Delete Button
                       IconButton(

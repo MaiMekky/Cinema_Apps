@@ -9,7 +9,7 @@ import '../widgets/movie_card.dart';
 import '../utils/app_colors.dart';
 import 'add_movie_screen.dart';
 import 'booking_overview_screen.dart';
-import 'movie_form_screen.dart';
+
 import 'notification_screen.dart';
 
 class VendorDashboardScreen extends StatelessWidget {
@@ -127,12 +127,6 @@ class VendorDashboardScreen extends StatelessWidget {
                   context,
                   MaterialPageRoute(
                     builder: (_) => BookingOverviewScreen( movieId: movie.id,movieModel: movie,),
-                  ),
-                );},
-                  onEdit: () { Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => MovieFormScreen(movie: movie),
                   ),
                 );},
                   onDelete: () => context.read<MoviesCubit>().deleteMovie(movie.id),

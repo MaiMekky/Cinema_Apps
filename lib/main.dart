@@ -3,7 +3,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '/services/movies_repository.dart';
 import '/cubit/movies/movies_cubit.dart';
 import '/cubit/add_movie/add_movie_cubit.dart';
-import '/cubit/edit_movie/edit_movie_cubit.dart';
 import '/cubit/dashboard/dashboard_cubit.dart';
 import 'screens/vendor_dashboard_screen.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -20,7 +19,6 @@ void main() async {
       providers: [
         BlocProvider(create: (_) => MoviesCubit(repo)..watchAll()),
         BlocProvider(create: (_) => AddMovieCubit(repo)),
-        BlocProvider(create: (_) => EditMovieCubit(repo)),
         BlocProvider(create: (_) => DashboardCubit(repo)..start()),
       ],
       child: const MyApp(),

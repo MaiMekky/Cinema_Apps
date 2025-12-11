@@ -1,9 +1,10 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
-import '../models/movie.dart';
+import '../models/movie_model.dart';
 import '../utils/app_colors.dart';
 
 class MovieCard extends StatelessWidget {
-  final Movie movie;
+  final MovieModel movie;
   final VoidCallback onView;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
@@ -35,8 +36,8 @@ class MovieCard extends StatelessWidget {
             // Movie Image
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
-              child: Image.network(
-                movie.imageUrl,
+              child: Image.memory(
+                base64Decode(movie.imageBase64),
                 width: isSmallScreen ? 100 : (isMediumScreen ? 120 : 140),
                 height: isSmallScreen ? 160 : (isMediumScreen ? 180 : 200),
                 fit: BoxFit.cover,

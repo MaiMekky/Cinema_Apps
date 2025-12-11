@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
-import '../models/movie.dart';
+import '../models/movie_model.dart';
 import '../utils/app_colors.dart';
 
 class MovieFormScreen extends StatefulWidget {
-  final Movie? movie;
+  final MovieModel? movie;
 
   const MovieFormScreen({super.key, this.movie});
 
@@ -31,7 +31,7 @@ class _MovieFormScreenState extends State<MovieFormScreen> {
       final m = widget.movie!;
       _titleController.text = m.title;
       _descController.text = m.description;
-      _imageController.text = m.imageUrl;
+      _imageController.text = m.imageBase64;
       _durationController.text = m.duration.toString();
 
       for (var slot in m.timeSlots) {
@@ -58,11 +58,11 @@ class _MovieFormScreenState extends State<MovieFormScreen> {
   void saveForm() {
     if (!_formKey.currentState!.validate()) return;
 
-    final movie = Movie(
+    final movie = MovieModel(
       id: isEdit ? widget.movie!.id : const Uuid().v4(),
       title: _titleController.text.trim(),
       description: _descController.text.trim(),
-      imageUrl: _imageController.text.trim(),
+      imageBase64: _imageController.text.trim(),
       duration: int.parse(_durationController.text.trim()),
       timeSlots: _slotControllers.map((c) => c.text.trim()).toList(),
     );

@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../models/movie.dart';
 import '../../models/seat.dart';
-import '../../models/screening.dart';
+import '../../models/slot.dart';
 import '../../services/booking_service.dart';
 import '../../utils/app_colors.dart';
 
@@ -15,13 +18,14 @@ class BookingPage extends StatefulWidget {
   State<BookingPage> createState() => _BookingPageState();
 }
 
-
 class _BookingPageState extends State<BookingPage> {
   Movie? _movie;
-  List<Screening> _screenings = [];
-  Screening? _selectedScreening;
+  List<Slot> _slots = [];
+  Slot? _selectedSlot;
+  Map<String, Seat> _seats = {};
   final List<String> _selectedSeats = [];
   bool _isLoading = true;
+  StreamSubscription? _seatsSubscription;
 
   @override
   void initState() {
@@ -29,17 +33,27 @@ class _BookingPageState extends State<BookingPage> {
     _loadData();
   }
 
+  @override
+  void dispose() {
+    _seatsSubscription?.cancel();
+    super.dispose();
+  }
+
   Future<void> _loadData() async {
     try {
-      // final movie = await BookingService.getMovie(widget.movieId);
-      final screenings = await BookingService.getScreenings(widget.movieId);
-
+      final movie = await BookingService.getMovie(widget.movieId);
+      final slots = await BookingService.getSlots(widget.movieId);
+      
       setState(() {
-        // _movie = movie;
-        _screenings = screenings;
-        _selectedScreening = screenings.isNotEmpty ? screenings[0] : null;
+        _movie = movie;
+        _slots = slots;
+        _selectedSlot = slots.isNotEmpty ? slots[0] : null;
         _isLoading = false;
       });
+
+      if (_selectedSlot != null) {
+        _loadSeats(_selectedSlot!.id);
+      }
     } catch (e) {
       print("Error loading booking data: $e");
       setState(() {
@@ -48,14 +62,46 @@ class _BookingPageState extends State<BookingPage> {
     }
   }
 
-  void _selectScreening(Screening screening) {
-    setState(() {
-      _selectedScreening = screening;
-      _selectedSeats.clear();
+  void _loadSeats(String slotId) {
+    // Cancel previous subscription
+    _seatsSubscription?.cancel();
+    
+    // Get initial seats
+    BookingService.getSeats(widget.movieId, slotId).then((seats) {
+      if (mounted) {
+        setState(() {
+          _seats = seats;
+          _selectedSeats.clear();
+        });
+      }
+    });
+
+    // Listen for real-time updates
+    _seatsSubscription = BookingService.listenToSeats(widget.movieId, slotId).listen((seats) {
+      if (mounted) {
+        setState(() {
+          _seats = seats;
+          // Remove any selected seats that are now booked
+          _selectedSeats.removeWhere((seatId) => seats[seatId]?.booked == true);
+        });
+      }
     });
   }
 
+  void _selectSlot(Slot slot) {
+    if (_selectedSlot?.id != slot.id) {
+      setState(() {
+        _selectedSlot = slot;
+        _selectedSeats.clear();
+      });
+      _loadSeats(slot.id);
+    }
+  }
+
   void _toggleSeat(String seatId) {
+    final seat = _seats[seatId];
+    if (seat == null || seat.booked) return;
+
     setState(() {
       if (_selectedSeats.contains(seatId)) {
         _selectedSeats.remove(seatId);
@@ -66,7 +112,7 @@ class _BookingPageState extends State<BookingPage> {
   }
 
   Future<void> _confirmBooking() async {
-    if (_selectedScreening == null || _selectedSeats.isEmpty) return;
+    if (_selectedSlot == null || _selectedSeats.isEmpty) return;
 
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
@@ -77,11 +123,25 @@ class _BookingPageState extends State<BookingPage> {
     }
 
     try {
-      await BookingService.bookSeats(
+      // Check availability first
+      final isAvailable = await BookingService.checkSeatsAvailability(
         movieId: widget.movieId,
-        screeningId: _selectedScreening!.id,
+        slotId: _selectedSlot!.id,
         seatIds: _selectedSeats,
-        userId: user.uid,
+      );
+
+      if (!isAvailable) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Some seats are no longer available. Please select different seats.')),
+        );
+        return;
+      }
+
+      // Use transaction for safer booking
+      await BookingService.bookSeatsWithTransaction(
+        movieId: widget.movieId,
+        slotId: _selectedSlot!.id,
+        seatIds: _selectedSeats,
       );
 
       showDialog(
@@ -93,7 +153,7 @@ class _BookingPageState extends State<BookingPage> {
             style: TextStyle(color: AppColors.textPrimary),
           ),
           content: Text(
-            'You have successfully booked ${_selectedSeats.length} seat(s) for ${_movie?.title}\n\nTime: ${_formatTime(_selectedScreening!.startTime)}\nSeats: ${_selectedSeats.join(', ')}',
+            'You have successfully booked ${_selectedSeats.length} seat(s) for ${_movie?.title}\n\nTime: ${_selectedSlot?.label}\nSeats: ${_selectedSeats.join(', ')}',
             style: const TextStyle(color: AppColors.textSecondary),
           ),
           actions: [
@@ -108,20 +168,51 @@ class _BookingPageState extends State<BookingPage> {
         ),
       );
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Booking failed: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Booking failed: $e')),
+      );
     }
   }
 
-  String _formatTime(DateTime time) {
-    return '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+  // Calculate available seats
+  int get _availableSeats {
+    return _seats.values.where((seat) => !seat.booked).length;
   }
 
-  String _formatDuration(int minutes) {
-    final hours = minutes ~/ 60;
-    final mins = minutes % 60;
-    return '${hours}h ${mins}m';
+  // Format seat layout based on seat numbers
+  Map<String, List<Seat>> _organizeSeatsByRow() {
+    final rows = <String, List<Seat>>{};
+    
+    for (var seat in _seats.values) {
+      // Extract row letter and seat number
+      final seatNumber = int.tryParse(seat.id);
+      if (seatNumber != null) {
+        // Determine row based on seat number
+        String rowLetter;
+        if (seatNumber <= 9) rowLetter = 'A';
+        else if (seatNumber <= 18) rowLetter = 'B';
+        else if (seatNumber <= 27) rowLetter = 'C';
+        else if (seatNumber <= 36) rowLetter = 'D';
+        else if (seatNumber <= 45) rowLetter = 'E';
+        else if (seatNumber <= 54) rowLetter = 'F';
+        else if (seatNumber <= 63) rowLetter = 'G';
+        else rowLetter = 'H';
+        
+        rows.putIfAbsent(rowLetter, () => []);
+        rows[rowLetter]!.add(seat);
+      }
+    }
+    
+    // Sort seats within each row
+    for (var row in rows.values) {
+      row.sort((a, b) {
+        final aNum = int.tryParse(a.id) ?? 0;
+        final bNum = int.tryParse(b.id) ?? 0;
+        return aNum.compareTo(bNum);
+      });
+    }
+    
+    return rows;
   }
 
   @override
@@ -134,6 +225,29 @@ class _BookingPageState extends State<BookingPage> {
         ),
       );
     }
+
+    if (_movie == null) {
+      return Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
+            onPressed: () => Navigator.pop(context),
+          ),
+        ),
+        body: const Center(
+          child: Text(
+            'Movie not found',
+            style: TextStyle(color: AppColors.textPrimary, fontSize: 18),
+          ),
+        ),
+      );
+    }
+
+    final seatRows = _organizeSeatsByRow();
+    final sortedRowLetters = seatRows.keys.toList()..sort();
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -154,6 +268,7 @@ class _BookingPageState extends State<BookingPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Movie poster
             Container(
               height: 220,
               width: double.infinity,
@@ -175,6 +290,7 @@ class _BookingPageState extends State<BookingPage> {
               ),
             ),
 
+            // Movie title
             Text(
               _movie!.title,
               style: const TextStyle(
@@ -184,6 +300,8 @@ class _BookingPageState extends State<BookingPage> {
               ),
             ),
             const SizedBox(height: 8),
+            
+            // Movie description
             Text(
               _movie!.description,
               style: const TextStyle(
@@ -193,19 +311,21 @@ class _BookingPageState extends State<BookingPage> {
               ),
             ),
             const SizedBox(height: 16),
+            
+            // Movie details
             Row(
               children: [
                 const Icon(Icons.schedule, color: AppColors.textSecondary, size: 20),
                 const SizedBox(width: 8),
                 Text(
-                  _formatDuration(_movie!.duration),
+                  '${_movie!.duration} min',
                   style: const TextStyle(color: AppColors.textSecondary),
                 ),
                 const SizedBox(width: 24),
-                const Icon(Icons.movie, color: AppColors.textSecondary, size: 20),
+                const Icon(Icons.event_seat, color: AppColors.textSecondary, size: 20),
                 const SizedBox(width: 8),
                 Text(
-                  '${_screenings.length} showtimes',
+                  '${_movie!.seats} seats',
                   style: const TextStyle(color: AppColors.textSecondary),
                 ),
               ],
@@ -214,9 +334,10 @@ class _BookingPageState extends State<BookingPage> {
 
             const Divider(color: AppColors.card),
 
+            // Time slots
             const SizedBox(height: 16),
             const Text(
-              'Select Showtime',
+              'Select Time Slot',
               style: TextStyle(
                 color: AppColors.textPrimary,
                 fontSize: 22,
@@ -225,31 +346,26 @@ class _BookingPageState extends State<BookingPage> {
             ),
             const SizedBox(height: 16),
 
-            GridView.count(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              crossAxisCount: 2,
-              childAspectRatio: 3,
-              crossAxisSpacing: 12,
-              mainAxisSpacing: 12,
-              children: _screenings.map((screening) {
-                final isSelected = _selectedScreening?.id == screening.id;
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: _slots.map((slot) {
+                final isSelected = _selectedSlot?.id == slot.id;
                 return GestureDetector(
-                  onTap: () => _selectScreening(screening),
+                  onTap: () => _selectSlot(slot),
                   child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                     decoration: BoxDecoration(
                       color: isSelected ? Colors.red : AppColors.card,
                       borderRadius: BorderRadius.circular(12),
                       border: isSelected ? Border.all(color: Colors.red, width: 2) : null,
                     ),
-                    child: Center(
-                      child: Text(
-                        _formatTime(screening.startTime),
-                        style: TextStyle(
-                          color: isSelected ? Colors.white : AppColors.textPrimary,
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
+                    child: Text(
+                      slot.label,
+                      style: TextStyle(
+                        color: isSelected ? Colors.white : AppColors.textPrimary,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
                   ),
@@ -259,7 +375,8 @@ class _BookingPageState extends State<BookingPage> {
 
             const SizedBox(height: 24),
 
-            if (_selectedScreening != null) ...[
+            if (_selectedSlot != null) ...[
+              // Available seats count
               Container(
                 padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 20),
                 decoration: BoxDecoration(
@@ -277,7 +394,7 @@ class _BookingPageState extends State<BookingPage> {
                       ),
                     ),
                     Text(
-                      '${_selectedScreening!.availableSeats} / 47',
+                      '$_availableSeats / ${_movie!.seats}',
                       style: const TextStyle(
                         color: Colors.red,
                         fontSize: 20,
@@ -290,6 +407,7 @@ class _BookingPageState extends State<BookingPage> {
               const SizedBox(height: 24),
             ],
 
+            // Seat selection
             const Text(
               'Select Your Seats',
               style: TextStyle(
@@ -300,6 +418,7 @@ class _BookingPageState extends State<BookingPage> {
             ),
             const SizedBox(height: 16),
 
+            // Screen indicator
             Container(
               height: 40,
               margin: const EdgeInsets.symmetric(horizontal: 20),
@@ -330,15 +449,25 @@ class _BookingPageState extends State<BookingPage> {
             ),
             const SizedBox(height: 40),
 
-            if (_selectedScreening != null)
-              _buildSeatGrid(_selectedScreening!.seats),
+            // Seat grid
+            if (_seats.isNotEmpty)
+              _buildSeatGrid(seatRows, sortedRowLetters),
+            if (_seats.isEmpty)
+              const Center(
+                child: Text(
+                  'No seats available for this time slot',
+                  style: TextStyle(color: AppColors.textSecondary),
+                ),
+              ),
 
             const SizedBox(height: 32),
 
+            // Legend
             _buildLegend(),
 
             const SizedBox(height: 40),
 
+            // Book button
             SizedBox(
               width: double.infinity,
               height: 56,
@@ -369,109 +498,68 @@ class _BookingPageState extends State<BookingPage> {
     );
   }
 
-
-  Widget _buildSeatGrid(Map<String, Seat> seats) {
-    final rows = <String, List<Seat>>{};
-
-    for (var seat in seats.values) {
-      final row = seat.id[0];
-      rows.putIfAbsent(row, () => []);
-      rows[row]!.add(seat);
-    }
-
-    final sortedRows = rows.entries.toList()
-      ..sort((a, b) => a.key.compareTo(b.key));
-
-    for (var row in sortedRows) {
-      row.value.sort((a, b) {
-        final aNum = int.tryParse(a.id.substring(1)) ?? 0;
-        final bNum = int.tryParse(b.id.substring(1)) ?? 0;
-        return aNum.compareTo(bNum);
-      });
-    }
-
-    return Center(
-      child: Column(
-        children: sortedRows.asMap().entries.map((rowEntry) {
-          final rowIndex = rowEntry.key;
-          final rowLetter = rowEntry.value.key;
-          final rowSeats = rowEntry.value.value;
-          final isLastRow = rowIndex == sortedRows.length - 1;
-
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 16),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  rowLetter,
-                  style: TextStyle(
-                    color: AppColors.textPrimary,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
+  Widget _buildSeatGrid(Map<String, List<Seat>> seatRows, List<String> rowLetters) {
+    return Column(
+      children: rowLetters.map((rowLetter) {
+        final rowSeats = seatRows[rowLetter] ?? [];
+        final isWideRow = rowLetter == 'H'; // H row has 11 seats
+        
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 16),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // Row label
+              Text(
+                rowLetter,
+                style: TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
                 ),
-                const SizedBox(width: 10),
+              ),
+              const SizedBox(width: 10),
 
+              // Seats with aisle gap for rows A-G
+              if (!isWideRow)
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: List.generate(
-                    rowSeats.length + (isLastRow ? 0 : 2),
-                    (index) {
-                      if (!isLastRow) {
-                        if (index < 4) {
-                          final seat = rowSeats[index];
-                          final isSelected = _selectedSeats.contains(seat.id);
-                          final isBooked = seat.booked;
-
-                          return _buildSeatWidget(
-                            seat: seat,
-                            isSelected: isSelected,
-                            isBooked: isBooked,
-                          );
-                        } else if (index == 4 || index == 5) {
-                          return const SizedBox(width: 29);
-                        } else {
-                          final seatIndex = index - 2;
-                          final seat = rowSeats[seatIndex];
-                          final isSelected = _selectedSeats.contains(seat.id);
-                          final isBooked = seat.booked;
-
-                          return _buildSeatWidget(
-                            seat: seat,
-                            isSelected: isSelected,
-                            isBooked: isBooked,
-                          );
-                        }
-                      } else {
-                        final seat = rowSeats[index];
-                        final isSelected = _selectedSeats.contains(seat.id);
-                        final isBooked = seat.booked;
-
-                        return _buildSeatWidget(
-                          seat: seat,
-                          isSelected: isSelected,
-                          isBooked: isBooked,
-                        );
-                      }
-                    },
-                  ),
+                  children: [
+                    // Left section (seats 1-4)
+                    Row(
+                      children: rowSeats.take(4).map((seat) {
+                        return _buildSeatWidget(seat);
+                      }).toList(),
+                    ),
+                    
+                    // Aisle gap
+                    const SizedBox(width: 29),
+                    
+                    // Right section (seats 5-9)
+                    Row(
+                      children: rowSeats.skip(4).map((seat) {
+                        return _buildSeatWidget(seat);
+                      }).toList(),
+                    ),
+                  ],
+                )
+              else
+                // Row H - all seats in one line (11 seats)
+                Row(
+                  children: rowSeats.map((seat) {
+                    return _buildSeatWidget(seat);
+                  }).toList(),
                 ),
-
-                if (rowLetter == 'F') const SizedBox(height: 24),
-              ],
-            ),
-          );
-        }).toList(),
-      ),
+            ],
+          ),
+        );
+      }).toList(),
     );
   }
 
-  Widget _buildSeatWidget({
-    required Seat seat,
-    required bool isSelected,
-    required bool isBooked,
-  }) {
+  Widget _buildSeatWidget(Seat seat) {
+    final isSelected = _selectedSeats.contains(seat.id);
+    final isBooked = seat.booked;
+
     return GestureDetector(
       onTap: isBooked ? null : () => _toggleSeat(seat.id),
       child: Container(
@@ -482,14 +570,14 @@ class _BookingPageState extends State<BookingPage> {
           color: isBooked
               ? Colors.grey[700]
               : isSelected
-              ? Colors.red
-              : AppColors.card,
+                  ? Colors.red
+                  : AppColors.card,
           borderRadius: BorderRadius.circular(8),
           border: isSelected
               ? Border.all(color: Colors.red, width: 2)
               : isBooked
-              ? Border.all(color: Colors.grey.shade600, width: 1)
-              : Border.all(color: Colors.white.withOpacity(0.1), width: 1),
+                  ? Border.all(color: Colors.grey.shade600, width: 1)
+                  : Border.all(color: Colors.white.withOpacity(0.1), width: 1),
           boxShadow: [
             if (isSelected)
               BoxShadow(
@@ -501,14 +589,14 @@ class _BookingPageState extends State<BookingPage> {
         ),
         child: Center(
           child: Text(
-            seat.id.substring(1),
+            seat.id, // Shows the seat number (1, 2, 3, etc.)
             style: TextStyle(
               color: isBooked
                   ? Colors.grey[400]
                   : isSelected
-                  ? Colors.white
-                  : AppColors.textPrimary,
-              fontSize: 12,
+                      ? Colors.white
+                      : AppColors.textPrimary,
+              fontSize: 10,
               fontWeight: FontWeight.bold,
             ),
           ),

@@ -1,97 +1,182 @@
-import 'dart:math';
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/movie.dart';
 import '../models/seat.dart';
-import '../models/screening.dart';
+import '../models/slot.dart';
 
 class BookingService {
-  // static Future<Movie> getMovie(String movieId) async {
-  //   return Movie(
-  //     id: '1',
-  //     title: 'The Dark Universe',
-  //     description:
-  //         'An epic space adventure following a crew of explorers as they venture into the unknown depths of space, encountering mysterious alien civilizations.',
-  //     posterUrl: 'https://picsum.photos/600/400',
-  //     duration: 120,
-  //   );
-  // }
+  static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  static Future<List<Screening>> getScreenings(String movieId) async {
-    return [
-      Screening(
-        id: '1',
-        startTime: DateTime.now().add(const Duration(days: 1, hours: 10)),
-        seats: _generateSeats(),
-      ),
-      Screening(
-        id: '2',
-        startTime: DateTime.now().add(const Duration(days: 1, hours: 14)),
-        seats: _generateSeats(),
-      ),
-      Screening(
-        id: '3',
-        startTime: DateTime.now().add(const Duration(days: 1, hours: 18)),
-        seats: _generateSeats(),
-      ),
-      Screening(
-        id: '4',
-        startTime: DateTime.now().add(const Duration(days: 1, hours: 21)),
-        seats: _generateSeats(),
-      ),
-    ];
+  // Get movie details
+  static Future<Movie> getMovie(String movieId) async {
+    final doc = await _firestore.collection('movies').doc(movieId).get();
+    if (doc.exists) {
+      return Movie.fromMap(doc.data()!, doc.id);
+    }
+    throw Exception('Movie not found');
   }
 
-  static Map<String, Seat> _generateSeats() {
+  // Get slots for a movie
+  static Future<List<Slot>> getSlots(String movieId) async {
+    final snapshot = await _firestore
+        .collection('movies')
+        .doc(movieId)
+        .collection('slots')
+        .get();
+    
+    return snapshot.docs
+        .map((doc) => Slot.fromMap(doc.data(), doc.id))
+        .toList();
+  }
+
+  // Get seats for a specific slot
+  static Future<Map<String, Seat>> getSeats(String movieId, String slotId) async {
+    final snapshot = await _firestore
+        .collection('movies')
+        .doc(movieId)
+        .collection('slots')
+        .doc(slotId)
+        .collection('seats')
+        .get();
+    
     final seats = <String, Seat>{};
-    final random = Random();
-
-    const rowsAG = ['A', 'B', 'C', 'D'];
-    for (var row in rowsAG) {
-      for (var i = 1; i <= 9; i++) {
-        final seatId = '$row$i';
-        final isPremium = row == 'G';
-        final bookingProbability = isPremium ? 0.35 : 0.2;
-        final isBooked = random.nextDouble() < bookingProbability;
-
-        seats[seatId] = Seat(
-          id: seatId,
-          booked: isBooked,
-          userId: isBooked ? 'u${random.nextInt(1000)}' : null,
-        );
-      }
-    }
-
-    const rowH = 'H';
-    for (var i = 1; i <= 11; i++) {
-      final seatId = '$rowH$i';
-      final isBooked = random.nextDouble() < 0.35;
-
-      seats[seatId] = Seat(
-        id: seatId,
-        booked: isBooked,
-        userId: isBooked ? 'u${random.nextInt(1000)}' : null,
+    for (var doc in snapshot.docs) {
+      final data = doc.data();
+      seats[doc.id] = Seat(
+        id: doc.id,
+        booked: data['booked'] ?? false,
       );
     }
-
-    print(seats.length);
     return seats;
   }
 
-  static Future<void> bookSeats({
-    required String movieId,
-    required String screeningId,
-    required List<String> seatIds,
-    required String userId,
-  }) async {
-    await FirebaseFirestore.instance
+  // Real-time stream for seats
+  static Stream<Map<String, Seat>> listenToSeats(String movieId, String slotId) {
+    return _firestore
         .collection('movies')
         .doc(movieId)
-        .collection('screenings')
-        .doc(screeningId)
-        .update({
-          for (var seatId in seatIds) 'seats.$seatId.booked': true,
-          for (var seatId in seatIds) 'seats.$seatId.userId': userId,
+        .collection('slots')
+        .doc(slotId)
+        .collection('seats')
+        .snapshots()
+        .map((snapshot) {
+          final seats = <String, Seat>{};
+          for (var doc in snapshot.docs) {
+            final data = doc.data();
+            seats[doc.id] = Seat(
+              id: doc.id,
+              booked: data['booked'] ?? false,
+            );
+          }
+          return seats;
         });
   }
+
+  static Future<bool> checkSeatsAvailability({
+    required String movieId,
+    required String slotId,
+    required List<String> seatIds,
+  }) async {
+    try {
+      final unavailableSeats = await _checkUnavailableSeats(movieId, slotId, seatIds);
+      return unavailableSeats.isEmpty;
+    } catch (e) {
+      print('Error checking seat availability: $e');
+      return false;
+    }
+  }
+
+  static Future<List<String>> _checkUnavailableSeats(
+    String movieId, 
+    String slotId, 
+    List<String> seatIds
+  ) async {
+    if (seatIds.isEmpty) return [];
+    
+    final seatsRef = _firestore
+        .collection('movies')
+        .doc(movieId)
+        .collection('slots')
+        .doc(slotId)
+        .collection('seats');
+    
+    final unavailableSeats = <String>[];
+    
+    // Process in chunks of 10 (Firestore 'whereIn' limit)
+    for (var i = 0; i < seatIds.length; i += 10) {
+      final chunk = seatIds.sublist(
+        i, 
+        i + 10 > seatIds.length ? seatIds.length : i + 10
+      );
+      
+      try {
+        final snapshot = await seatsRef.where(FieldPath.documentId, whereIn: chunk).get();
+        
+        for (var doc in snapshot.docs) {
+          if (doc.data()['booked'] == true) {
+            unavailableSeats.add(doc.id);
+          }
+        }
+      } catch (e) {
+        print('Error checking seat chunk: $e');
+        unavailableSeats.addAll(chunk);
+      }
+    }
+    
+    return unavailableSeats;
+  }
+
+  static Future<void> bookSeatsWithTransaction({
+    required String movieId,
+    required String slotId,
+    required List<String> seatIds,
+  }) async {
+    if (seatIds.isEmpty) {
+      throw Exception('No seats selected');
+    }
+    
+    await _firestore.runTransaction((transaction) async {
+      // Get ALL seat documents individually within transaction
+      final seatStatus = <String, bool>{};
+      
+      for (var seatId in seatIds) {
+        final seatRef = _firestore
+            .collection('movies')
+            .doc(movieId)
+            .collection('slots')
+            .doc(slotId)
+            .collection('seats')
+            .doc(seatId);
+        
+        final seatDoc = await transaction.get(seatRef);
+        
+        if (!seatDoc.exists) {
+          throw Exception('Seat $seatId not found');
+        }
+        
+        final isBooked = seatDoc.data()?['booked'] == true;
+        seatStatus[seatId] = isBooked;
+        
+        if (isBooked) {
+          throw Exception('Seat $seatId is already booked');
+        }
+      }
+      
+      // Update all selected seats
+      for (var seatId in seatIds) {
+        final seatRef = _firestore
+            .collection('movies')
+            .doc(movieId)
+            .collection('slots')
+            .doc(slotId)
+            .collection('seats')
+            .doc(seatId);
+        
+        transaction.update(seatRef, {
+          'booked': true,
+          'bookedAt': FieldValue.serverTimestamp(),
+        });
+      }
+    });
+  }
+
 }

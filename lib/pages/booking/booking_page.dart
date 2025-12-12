@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -276,8 +277,13 @@ class _BookingPageState extends State<BookingPage> {
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(16),
                 image: DecorationImage(
-                  image: NetworkImage(_movie!.imageBase64),
-                  fit: BoxFit.cover,
+                  image: MemoryImage(
+                    base64Decode(
+                      _movie!.imageBase64.replaceAll(RegExp(r'\s'), '')
+                    ),
+                  ),
+                  fit: BoxFit.fitWidth,
+                  alignment: Alignment.center,
                 ),
                 boxShadow: [
                   BoxShadow(

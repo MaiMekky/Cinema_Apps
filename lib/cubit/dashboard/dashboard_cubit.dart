@@ -1,4 +1,4 @@
-// lib/vendor/cubits/dashboard/dashboard_cubit.dart
+
 import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../services/movies_repository.dart';
@@ -10,7 +10,7 @@ class DashboardCubit extends Cubit<DashboardState> {
   final MoviesRepository _repo;
   StreamSubscription<List<MovieModel>>? _moviesSub;
   final Map<String, StreamSubscription<int>> _slotSubs = {};
-  final Map<String, Map<String,int>> _bookings = {}; // movieId -> {slotDocId: count}
+  final Map<String, Map<String,int>> _bookings = {}; 
 
   DashboardCubit(this._repo) : super(DashboardInitial());
 
@@ -27,7 +27,7 @@ class DashboardCubit extends Cubit<DashboardState> {
   Future<void> _syncSlotListeners(List<MovieModel> movies) async {
     final movieIds = movies.map((m) => m.id).toSet();
 
-    // remove listeners for deleted movies
+   
     final toRemove = _bookings.keys.where((id) => !movieIds.contains(id)).toList();
     for (final mid in toRemove) {
       _bookings.remove(mid);

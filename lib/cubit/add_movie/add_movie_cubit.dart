@@ -4,12 +4,13 @@ import 'dart:convert';
 import 'package:cinema_apps/services/movies_repository.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+// import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../models/movie_model.dart';
 import 'add_movie_state.dart';
 
 class AddMovieCubit extends Cubit<AddMovieState> {
-  AddMovieCubit(MoviesRepository repo) : super(AddMovieInitial());
+  final MoviesRepository repo;
+  AddMovieCubit(this.repo) : super(AddMovieInitial());
 
   Future<void> addMovie({
     required String title,
@@ -28,7 +29,6 @@ class AddMovieCubit extends Cubit<AddMovieState> {
     try {
       emit(AddMovieLoading());
 
-      // 1️⃣ Convert image to Base64
       String imageBase64 = '';
       if (kIsWeb && webImage != null) {
         imageBase64 = base64Encode(webImage);
@@ -37,9 +37,8 @@ class AddMovieCubit extends Cubit<AddMovieState> {
         imageBase64 = base64Encode(bytes);
       }
 
-      // 2️⃣ Create MovieModel
       final movie = MovieModel(
-        id: '', // Firestore will generate ID
+        id: '',
         title: title,
         description: description,
         imageBase64: imageBase64,
@@ -48,10 +47,8 @@ class AddMovieCubit extends Cubit<AddMovieState> {
         seats: seats,
       );
 
-      // 3️⃣ Save to Firestore
-      final docRef =
-          await FirebaseFirestore.instance.collection('movies').add(movie.toMap());
-      final savedMovie = movie.copyWith(id: docRef.id);
+      // ✅ Save movie properly (only one document)
+      final savedMovie = await repo.addMovie(movie);
 
       emit(AddMovieSuccess(savedMovie));
     } catch (e) {
@@ -59,3 +56,4 @@ class AddMovieCubit extends Cubit<AddMovieState> {
     }
   }
 }
+

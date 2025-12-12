@@ -37,46 +37,46 @@ Future<void> updateMovieModel(String id, MovieModel movie) async {
       .update(movie.toMap());
 }
 
-  // Add new movie (uploads image if provided)
-  Future<MovieModel> addMovie({
-    required String title,
-    required String description,
-    File? imageFile,
-    required int duration,
-    required List<String> timeSlots,
-    int seats = 47,
-  }) async {
-    String imageUrl = '';
-    if (imageFile != null) {
-      final id = const Uuid().v4();
-      final ref = _storage.ref('movies/$id.jpg');
-      await ref.putFile(imageFile);
-      imageUrl = await ref.getDownloadURL();
+  Future<MovieModel> addMovie(MovieModel movie) async {
+  try {
+    final moviesRef = _firestore.collection('movies');
+
+    // 1️⃣ Save movie document (without ID)
+    final docRef = await moviesRef.add(movie.toMap());
+
+    // 2️⃣ Update movie with ID
+    final savedMovie = movie.copyWith(id: docRef.id);
+
+    // 3️⃣ Create slots
+    final slotsRef = docRef.collection('slots');
+
+    for (int i = 0; i < savedMovie.timeSlots.length; i++) {
+      final slotId = "slot_${i + 1}";
+      final slotLabel = savedMovie.timeSlots[i];
+
+      final slotDoc = slotsRef.doc(slotId);
+
+      await slotDoc.set({
+        "label": slotLabel,
+        "createdAt": FieldValue.serverTimestamp(),
+      });
+
+      // 4️⃣ Create seats subcollection
+      final seatsRef = slotDoc.collection("seats");
+
+      for (int seat = 1; seat <= savedMovie.seats; seat++) {
+        await seatsRef.doc(seat.toString()).set({
+          "booked": false,
+        });
+      }
     }
 
-    final docRef = await _movies.add({
-      'title': title,
-      'description': description,
-      'imageUrl': imageUrl,
-      'duration': duration,
-      'timeSlots': timeSlots,
-      'seats': seats,
-      'createdAt': FieldValue.serverTimestamp(),
-    });
-
-    // Initialize slots and seats
-    await _initSlotsAndSeats(docRef.id, timeSlots, seats);
-
-    return MovieModel(
-      id: docRef.id,
-      title: title,
-      description: description,
-      imageBase64: imageUrl,
-      duration: duration,
-      timeSlots: timeSlots,
-      seats: seats,
-    );
+    return savedMovie;
+  } catch (e) {
+    rethrow;
   }
+}
+
 
   Future<void> _initSlotsAndSeats(String movieId, List<String> slots, int seats) async {
     final batch = _firestore.batch();

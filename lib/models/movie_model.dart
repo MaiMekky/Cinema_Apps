@@ -43,7 +43,7 @@ class MovieModel {
   Map<String, dynamic> toMap() => {
         'title': title,
         'description': description,
-        'imageBase64': imageBase64, // <-- store Base64 here
+        'imageBase64': imageBase64, 
         'duration': duration,
         'timeSlots': timeSlots,
         'seats': seats,

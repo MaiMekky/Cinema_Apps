@@ -1,4 +1,4 @@
-// lib/vendor/cubits/movies/movies_cubit.dart
+
 import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../services/movies_repository.dart';

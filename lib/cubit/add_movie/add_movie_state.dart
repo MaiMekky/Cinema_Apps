@@ -1,4 +1,4 @@
-// lib/vendor/cubits/add_movie/add_movie_state.dart
+
 import '../../models/movie_model.dart';
 
 abstract class AddMovieState {}

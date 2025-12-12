@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../models/movie.dart';
 import '../../utils/app_colors.dart';
-
+import 'dart:convert';
+import '../booking/booking_page.dart';
 class MovieCard extends StatelessWidget {
   final Movie movie;
   final VoidCallback onBook;
@@ -28,8 +29,8 @@ class MovieCard extends StatelessWidget {
               topLeft: Radius.circular(16),
               topRight: Radius.circular(16),
             ),
-            child: Image.network(
-              movie.posterUrl,
+            child: Image.memory(
+              base64Decode(movie.imageBase64),
               height: 170,
               width: double.infinity,
               fit: BoxFit.cover,
@@ -83,7 +84,14 @@ class MovieCard extends StatelessWidget {
                     ),
 
                     ElevatedButton(
-                      onPressed: onBook,
+                       onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => BookingPage(movieId: movie.id),
+                          ),
+                        );
+                      },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.red,
                         shape: RoundedRectangleBorder(

@@ -6,16 +6,16 @@ import '../models/seat.dart';
 import '../models/screening.dart';
 
 class BookingService {
-  static Future<Movie> getMovie(String movieId) async {
-    return Movie(
-      id: '1',
-      title: 'The Dark Universe',
-      description:
-          'An epic space adventure following a crew of explorers as they venture into the unknown depths of space, encountering mysterious alien civilizations.',
-      posterUrl: 'https://picsum.photos/600/400',
-      duration: 120,
-    );
-  }
+  // static Future<Movie> getMovie(String movieId) async {
+  //   return Movie(
+  //     id: '1',
+  //     title: 'The Dark Universe',
+  //     description:
+  //         'An epic space adventure following a crew of explorers as they venture into the unknown depths of space, encountering mysterious alien civilizations.',
+  //     posterUrl: 'https://picsum.photos/600/400',
+  //     duration: 120,
+  //   );
+  // }
 
   static Future<List<Screening>> getScreenings(String movieId) async {
     return [

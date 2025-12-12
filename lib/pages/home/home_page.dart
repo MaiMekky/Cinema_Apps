@@ -1,7 +1,7 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../../services/movies_service.dart';
 import '../../models/movie.dart';
 import '../../utils/app_colors.dart';
 import 'movie_card.dart';
@@ -23,11 +23,39 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
-    movies = MoviesService.getMovies();
-    filtered = movies;
+    loadMovies();
     loadUserName();
   }
 
+  /// 🔥 Load Movies from Firestore
+  Future<void> loadMovies() async {
+    final snapshot = await FirebaseFirestore.instance
+        .collection('movies')
+        .orderBy('createdAt', descending: true)
+        .get();
+
+    final loaded = snapshot.docs.map((doc) {
+      final data = doc.data();
+
+      return Movie(
+        id: doc.id,
+        title: data['title'] ?? '',
+        description: data['description'] ?? '',
+        duration: data['duration'] ?? 0,
+        seats: data['seats'] ?? 0,
+        imageBase64: data['imageBase64'] ?? '',
+        timeSlots: List<String>.from(data['timeSlots'] ?? []),
+        createdAt: (data['createdAt'] as Timestamp).toDate(),
+      );
+    }).toList();
+
+    setState(() {
+      movies = loaded;
+      filtered = loaded;
+    });
+  }
+
+  /// 🔥 Load User Name
   Future<void> loadUserName() async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
@@ -40,6 +68,7 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
+  /// 🔍 Search Filter
   void search(String value) {
     setState(() {
       filtered = movies
@@ -92,30 +121,31 @@ class _HomePageState extends State<HomePage> {
                   ),
 
                   // LOGOUT
-              GestureDetector(
-                onTap: () async {
-                  try {
-                    await FirebaseAuth.instance.signOut();
-                    if (context.mounted) {
-                      Navigator.of(context).pushAndRemoveUntil(
-                        MaterialPageRoute(builder: (context) => const LoginPage()),
-                        (route) => false,
-                      );
-                    }
-                  } catch (e) {
-                    print("Logout error: $e");
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text("Logout failed: $e")),
-                      );
-                    }
-                  }
-                },
-                child: const Icon(
-                  Icons.logout,
-                  color: AppColors.textSecondary,
-                ),
-              ),
+                  GestureDetector(
+                    onTap: () async {
+                      try {
+                        await FirebaseAuth.instance.signOut();
+                        if (context.mounted) {
+                          Navigator.of(context).pushAndRemoveUntil(
+                            MaterialPageRoute(
+                                builder: (context) => const LoginPage()),
+                            (route) => false,
+                          );
+                        }
+                      } catch (e) {
+                        print("Logout error: $e");
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text("Logout failed: $e")),
+                          );
+                        }
+                      }
+                    },
+                    child: const Icon(
+                      Icons.logout,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
                 ],
               ),
 
@@ -153,25 +183,33 @@ class _HomePageState extends State<HomePage> {
               const SizedBox(height: 10),
 
               Expanded(
-                child: ListView.builder(
-                  itemCount: filtered.length,
-                  itemBuilder: (context, index) {
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
-                      child: MovieCard(
-                        movie: filtered[index],
-                        onBook: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => BookingPage(movieId: filtered[index].id),
+                child: filtered.isEmpty
+                    ? const Center(
+                        child: Text(
+                          "No movies found",
+                          style: TextStyle(color: Colors.white54),
+                        ),
+                      )
+                    : ListView.builder(
+                        itemCount: filtered.length,
+                        itemBuilder: (context, index) {
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: MovieCard(
+                              movie: filtered[index],
+                              onBook: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) =>
+                                        BookingPage(movieId: filtered[index].id),
+                                  ),
+                                );
+                              },
                             ),
                           );
                         },
                       ),
-                    );
-                  },
-                ),
               ),
             ],
           ),

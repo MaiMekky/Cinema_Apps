@@ -31,11 +31,11 @@ class _BookingPageState extends State<BookingPage> {
 
   Future<void> _loadData() async {
     try {
-      final movie = await BookingService.getMovie(widget.movieId);
+      // final movie = await BookingService.getMovie(widget.movieId);
       final screenings = await BookingService.getScreenings(widget.movieId);
 
       setState(() {
-        _movie = movie;
+        // _movie = movie;
         _screenings = screenings;
         _selectedScreening = screenings.isNotEmpty ? screenings[0] : null;
         _isLoading = false;
@@ -161,7 +161,7 @@ class _BookingPageState extends State<BookingPage> {
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(16),
                 image: DecorationImage(
-                  image: NetworkImage(_movie!.posterUrl),
+                  image: NetworkImage(_movie!.imageBase64),
                   fit: BoxFit.cover,
                 ),
                 boxShadow: [

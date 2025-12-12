@@ -6,7 +6,6 @@ import '../models/slot.dart';
 class BookingService {
   static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  // Get movie details
   static Future<Movie> getMovie(String movieId) async {
     final doc = await _firestore.collection('movies').doc(movieId).get();
     if (doc.exists) {
@@ -15,7 +14,6 @@ class BookingService {
     throw Exception('Movie not found');
   }
 
-  // Get slots for a movie
   static Future<List<Slot>> getSlots(String movieId) async {
     final snapshot = await _firestore
         .collection('movies')
@@ -28,7 +26,6 @@ class BookingService {
         .toList();
   }
 
-  // Get seats for a specific slot
   static Future<Map<String, Seat>> getSeats(String movieId, String slotId) async {
     final snapshot = await _firestore
         .collection('movies')
@@ -49,7 +46,6 @@ class BookingService {
     return seats;
   }
 
-  // Real-time stream for seats
   static Stream<Map<String, Seat>> listenToSeats(String movieId, String slotId) {
     return _firestore
         .collection('movies')
@@ -101,7 +97,6 @@ class BookingService {
     
     final unavailableSeats = <String>[];
     
-    // Process in chunks of 10 (Firestore 'whereIn' limit)
     for (var i = 0; i < seatIds.length; i += 10) {
       final chunk = seatIds.sublist(
         i, 
@@ -135,7 +130,6 @@ class BookingService {
     }
     
     await _firestore.runTransaction((transaction) async {
-      // Get ALL seat documents individually within transaction
       final seatStatus = <String, bool>{};
       
       for (var seatId in seatIds) {
@@ -161,7 +155,6 @@ class BookingService {
         }
       }
       
-      // Update all selected seats
       for (var seatId in seatIds) {
         final seatRef = _firestore
             .collection('movies')

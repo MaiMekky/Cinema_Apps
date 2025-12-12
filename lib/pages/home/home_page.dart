@@ -27,7 +27,6 @@ class _HomePageState extends State<HomePage> {
     loadUserName();
   }
 
-  /// 🔥 Load Movies from Firestore
   Future<void> loadMovies() async {
     final snapshot = await FirebaseFirestore.instance
         .collection('movies')
@@ -55,7 +54,6 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
-  /// 🔥 Load User Name
   Future<void> loadUserName() async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
@@ -68,7 +66,6 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
-  /// 🔍 Search Filter
   void search(String value) {
     setState(() {
       filtered = movies
@@ -120,7 +117,6 @@ class _HomePageState extends State<HomePage> {
                     ],
                   ),
 
-                  // LOGOUT
                   GestureDetector(
                     onTap: () async {
                       try {

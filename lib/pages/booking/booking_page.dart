@@ -44,7 +44,7 @@ class _BookingPageState extends State<BookingPage> {
     try {
       final movie = await BookingService.getMovie(widget.movieId);
       final slots = await BookingService.getSlots(widget.movieId);
-      
+
       setState(() {
         _movie = movie;
         _slots = slots;
@@ -64,10 +64,8 @@ class _BookingPageState extends State<BookingPage> {
   }
 
   void _loadSeats(String slotId) {
-    // Cancel previous subscription
     _seatsSubscription?.cancel();
-    
-    // Get initial seats
+
     BookingService.getSeats(widget.movieId, slotId).then((seats) {
       if (mounted) {
         setState(() {
@@ -77,16 +75,17 @@ class _BookingPageState extends State<BookingPage> {
       }
     });
 
-    // Listen for real-time updates
-    _seatsSubscription = BookingService.listenToSeats(widget.movieId, slotId).listen((seats) {
-      if (mounted) {
-        setState(() {
-          _seats = seats;
-          // Remove any selected seats that are now booked
-          _selectedSeats.removeWhere((seatId) => seats[seatId]?.booked == true);
+    _seatsSubscription = BookingService.listenToSeats(widget.movieId, slotId)
+        .listen((seats) {
+          if (mounted) {
+            setState(() {
+              _seats = seats;
+              _selectedSeats.removeWhere(
+                (seatId) => seats[seatId]?.booked == true,
+              );
+            });
+          }
         });
-      }
-    });
   }
 
   void _selectSlot(Slot slot) {
@@ -124,7 +123,6 @@ class _BookingPageState extends State<BookingPage> {
     }
 
     try {
-      // Check availability first
       final isAvailable = await BookingService.checkSeatsAvailability(
         movieId: widget.movieId,
         slotId: _selectedSlot!.id,
@@ -133,12 +131,15 @@ class _BookingPageState extends State<BookingPage> {
 
       if (!isAvailable) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Some seats are no longer available. Please select different seats.')),
+          const SnackBar(
+            content: Text(
+              'Some seats are no longer available. Please select different seats.',
+            ),
+          ),
         );
         return;
       }
 
-      // Use transaction for safer booking
       await BookingService.bookSeatsWithTransaction(
         movieId: widget.movieId,
         slotId: _selectedSlot!.id,
@@ -169,51 +170,14 @@ class _BookingPageState extends State<BookingPage> {
         ),
       );
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Booking failed: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Booking failed: $e')));
     }
   }
 
-  // Calculate available seats
   int get _availableSeats {
     return _seats.values.where((seat) => !seat.booked).length;
-  }
-
-  // Format seat layout based on seat numbers
-  Map<String, List<Seat>> _organizeSeatsByRow() {
-    final rows = <String, List<Seat>>{};
-    
-    for (var seat in _seats.values) {
-      // Extract row letter and seat number
-      final seatNumber = int.tryParse(seat.id);
-      if (seatNumber != null) {
-        // Determine row based on seat number
-        String rowLetter;
-        if (seatNumber <= 9) rowLetter = 'A';
-        else if (seatNumber <= 18) rowLetter = 'B';
-        else if (seatNumber <= 27) rowLetter = 'C';
-        else if (seatNumber <= 36) rowLetter = 'D';
-        else if (seatNumber <= 45) rowLetter = 'E';
-        else if (seatNumber <= 54) rowLetter = 'F';
-        else if (seatNumber <= 63) rowLetter = 'G';
-        else rowLetter = 'H';
-        
-        rows.putIfAbsent(rowLetter, () => []);
-        rows[rowLetter]!.add(seat);
-      }
-    }
-    
-    // Sort seats within each row
-    for (var row in rows.values) {
-      row.sort((a, b) {
-        final aNum = int.tryParse(a.id) ?? 0;
-        final bNum = int.tryParse(b.id) ?? 0;
-        return aNum.compareTo(bNum);
-      });
-    }
-    
-    return rows;
   }
 
   @override
@@ -221,9 +185,7 @@ class _BookingPageState extends State<BookingPage> {
     if (_isLoading) {
       return Scaffold(
         backgroundColor: AppColors.background,
-        body: const Center(
-          child: CircularProgressIndicator(color: Colors.red),
-        ),
+        body: const Center(child: CircularProgressIndicator(color: Colors.red)),
       );
     }
 
@@ -248,7 +210,20 @@ class _BookingPageState extends State<BookingPage> {
     }
 
     final seatRows = _organizeSeatsByRow();
-    final sortedRowLetters = seatRows.keys.toList()..sort();
+    final sortedRowLetters = seatRows.keys.toList()
+      ..sort((a, b) {
+        final order = ['A', 'B', 'C', 'D', 'H'];
+        final aIndex = order.indexOf(a);
+        final bIndex = order.indexOf(b);
+
+        if (aIndex != -1 && bIndex != -1) {
+          return aIndex.compareTo(bIndex);
+        }
+        if (aIndex != -1) return -1;
+        if (bIndex != -1) return 1;
+
+        return a.compareTo(b);
+      });
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -269,7 +244,6 @@ class _BookingPageState extends State<BookingPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Movie poster
             Container(
               height: 220,
               width: double.infinity,
@@ -279,7 +253,7 @@ class _BookingPageState extends State<BookingPage> {
                 image: DecorationImage(
                   image: MemoryImage(
                     base64Decode(
-                      _movie!.imageBase64.replaceAll(RegExp(r'\s'), '')
+                      _movie!.imageBase64.replaceAll(RegExp(r'\s'), ''),
                     ),
                   ),
                   fit: BoxFit.fitWidth,
@@ -296,7 +270,6 @@ class _BookingPageState extends State<BookingPage> {
               ),
             ),
 
-            // Movie title
             Text(
               _movie!.title,
               style: const TextStyle(
@@ -306,8 +279,7 @@ class _BookingPageState extends State<BookingPage> {
               ),
             ),
             const SizedBox(height: 8),
-            
-            // Movie description
+
             Text(
               _movie!.description,
               style: const TextStyle(
@@ -317,18 +289,25 @@ class _BookingPageState extends State<BookingPage> {
               ),
             ),
             const SizedBox(height: 16),
-            
-            // Movie details
+
             Row(
               children: [
-                const Icon(Icons.schedule, color: AppColors.textSecondary, size: 20),
+                const Icon(
+                  Icons.schedule,
+                  color: AppColors.textSecondary,
+                  size: 20,
+                ),
                 const SizedBox(width: 8),
                 Text(
                   '${_movie!.duration} min',
                   style: const TextStyle(color: AppColors.textSecondary),
                 ),
                 const SizedBox(width: 24),
-                const Icon(Icons.event_seat, color: AppColors.textSecondary, size: 20),
+                const Icon(
+                  Icons.event_seat,
+                  color: AppColors.textSecondary,
+                  size: 20,
+                ),
                 const SizedBox(width: 8),
                 Text(
                   '${_movie!.seats} seats',
@@ -340,7 +319,6 @@ class _BookingPageState extends State<BookingPage> {
 
             const Divider(color: AppColors.card),
 
-            // Time slots
             const SizedBox(height: 16),
             const Text(
               'Select Time Slot',
@@ -360,16 +338,23 @@ class _BookingPageState extends State<BookingPage> {
                 return GestureDetector(
                   onTap: () => _selectSlot(slot),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 12,
+                    ),
                     decoration: BoxDecoration(
                       color: isSelected ? Colors.red : AppColors.card,
                       borderRadius: BorderRadius.circular(12),
-                      border: isSelected ? Border.all(color: Colors.red, width: 2) : null,
+                      border: isSelected
+                          ? Border.all(color: Colors.red, width: 2)
+                          : null,
                     ),
                     child: Text(
                       slot.label,
                       style: TextStyle(
-                        color: isSelected ? Colors.white : AppColors.textPrimary,
+                        color: isSelected
+                            ? Colors.white
+                            : AppColors.textPrimary,
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
                       ),
@@ -382,9 +367,11 @@ class _BookingPageState extends State<BookingPage> {
             const SizedBox(height: 24),
 
             if (_selectedSlot != null) ...[
-              // Available seats count
               Container(
-                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 20),
+                padding: const EdgeInsets.symmetric(
+                  vertical: 12,
+                  horizontal: 20,
+                ),
                 decoration: BoxDecoration(
                   color: AppColors.card,
                   borderRadius: BorderRadius.circular(12),
@@ -413,7 +400,6 @@ class _BookingPageState extends State<BookingPage> {
               const SizedBox(height: 24),
             ],
 
-            // Seat selection
             const Text(
               'Select Your Seats',
               style: TextStyle(
@@ -424,7 +410,6 @@ class _BookingPageState extends State<BookingPage> {
             ),
             const SizedBox(height: 16),
 
-            // Screen indicator
             Container(
               height: 40,
               margin: const EdgeInsets.symmetric(horizontal: 20),
@@ -455,9 +440,7 @@ class _BookingPageState extends State<BookingPage> {
             ),
             const SizedBox(height: 40),
 
-            // Seat grid
-            if (_seats.isNotEmpty)
-              _buildSeatGrid(seatRows, sortedRowLetters),
+            if (_seats.isNotEmpty) _buildSeatGrid(seatRows, sortedRowLetters),
             if (_seats.isEmpty)
               const Center(
                 child: Text(
@@ -468,12 +451,10 @@ class _BookingPageState extends State<BookingPage> {
 
             const SizedBox(height: 32),
 
-            // Legend
             _buildLegend(),
 
             const SizedBox(height: 40),
 
-            // Book button
             SizedBox(
               width: double.infinity,
               height: 56,
@@ -504,18 +485,21 @@ class _BookingPageState extends State<BookingPage> {
     );
   }
 
-  Widget _buildSeatGrid(Map<String, List<Seat>> seatRows, List<String> rowLetters) {
+  Widget _buildSeatGrid(
+    Map<String, List<Seat>> seatRows,
+    List<String> rowLetters,
+  ) {
     return Column(
       children: rowLetters.map((rowLetter) {
         final rowSeats = seatRows[rowLetter] ?? [];
-        final isWideRow = rowLetter == 'H'; // H row has 11 seats
-        
+        final isWideRow =
+            rowLetter == 'H'; 
+
         return Padding(
           padding: const EdgeInsets.only(bottom: 16),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Row label
               Text(
                 rowLetter,
                 style: TextStyle(
@@ -526,21 +510,17 @@ class _BookingPageState extends State<BookingPage> {
               ),
               const SizedBox(width: 10),
 
-              // Seats with aisle gap for rows A-G
               if (!isWideRow)
                 Row(
                   children: [
-                    // Left section (seats 1-4)
                     Row(
                       children: rowSeats.take(4).map((seat) {
                         return _buildSeatWidget(seat);
                       }).toList(),
                     ),
-                    
-                    // Aisle gap
-                    const SizedBox(width: 29),
-                    
-                    // Right section (seats 5-9)
+
+                    const SizedBox(width: 60),
+
                     Row(
                       children: rowSeats.skip(4).map((seat) {
                         return _buildSeatWidget(seat);
@@ -549,7 +529,6 @@ class _BookingPageState extends State<BookingPage> {
                   ],
                 )
               else
-                // Row H - all seats in one line (11 seats)
                 Row(
                   children: rowSeats.map((seat) {
                     return _buildSeatWidget(seat);
@@ -576,14 +555,14 @@ class _BookingPageState extends State<BookingPage> {
           color: isBooked
               ? Colors.grey[700]
               : isSelected
-                  ? Colors.red
-                  : AppColors.card,
+              ? Colors.red
+              : AppColors.card,
           borderRadius: BorderRadius.circular(8),
           border: isSelected
               ? Border.all(color: Colors.red, width: 2)
               : isBooked
-                  ? Border.all(color: Colors.grey.shade600, width: 1)
-                  : Border.all(color: Colors.white.withOpacity(0.1), width: 1),
+              ? Border.all(color: Colors.grey.shade600, width: 1)
+              : Border.all(color: Colors.white.withOpacity(0.1), width: 1),
           boxShadow: [
             if (isSelected)
               BoxShadow(
@@ -600,8 +579,8 @@ class _BookingPageState extends State<BookingPage> {
               color: isBooked
                   ? Colors.grey[400]
                   : isSelected
-                      ? Colors.white
-                      : AppColors.textPrimary,
+                  ? Colors.white
+                  : AppColors.textPrimary,
               fontSize: 10,
               fontWeight: FontWeight.bold,
             ),
@@ -668,5 +647,64 @@ class _BookingPageState extends State<BookingPage> {
         ),
       ],
     );
+  }
+
+  Map<String, List<Seat>> _organizeSeatsByRow() {
+    final rows = <String, List<Seat>>{};
+
+    for (var seat in _seats.values) {
+      final seatNumber = int.tryParse(seat.id);
+      if (seatNumber != null) {
+        String rowLetter;
+
+        if (seatNumber <= 9) {
+          rowLetter = 'A';
+        } else if (seatNumber <= 18) {
+          rowLetter = 'B';
+        } else if (seatNumber <= 27) {
+          rowLetter = 'C';
+        } else if (seatNumber <= 36) {
+          rowLetter = 'D';
+        } else if (seatNumber <= 47) {
+          rowLetter = 'H';
+        } else {
+          if (seatNumber <= 56) {
+            rowLetter = 'E';
+          } else if (seatNumber <= 65) {
+            rowLetter = 'F';
+          } else {
+            rowLetter = 'G';
+          }
+        }
+
+        rows.putIfAbsent(rowLetter, () => []);
+        rows[rowLetter]!.add(seat);
+      }
+    }
+
+    for (var row in rows.values) {
+      row.sort((a, b) {
+        final aNum = int.tryParse(a.id) ?? 0;
+        final bNum = int.tryParse(b.id) ?? 0;
+        return aNum.compareTo(bNum);
+      });
+    }
+
+    final orderedRows = <String, List<Seat>>{};
+    final rowOrder = ['A', 'B', 'C', 'D', 'H'];
+
+    for (var rowLetter in rowOrder) {
+      if (rows.containsKey(rowLetter)) {
+        orderedRows[rowLetter] = rows[rowLetter]!;
+      }
+    }
+
+    for (var rowLetter in rows.keys) {
+      if (!orderedRows.containsKey(rowLetter)) {
+        orderedRows[rowLetter] = rows[rowLetter]!;
+      }
+    }
+
+    return orderedRows;
   }
 }

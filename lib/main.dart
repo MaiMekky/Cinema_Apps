@@ -17,17 +17,39 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  try {
-    final data = message.data;
-    await FirebaseFirestore.instance.collection('notifications').add({
-      'title': message.notification?.title ?? data['title'] ?? 'Notification',
-      'message': message.notification?.body ?? data['body'] ?? '',
-      'data': data,
-      'createdAt': FieldValue.serverTimestamp(),
-      'seen': false,
-    });
-  } catch (e) {}
+  final data = message.data;
+  final title = message.notification?.title ?? data['title'] ?? 'Notification';
+  final body = message.notification?.body ?? data['body'] ?? '';
+
+  // Save to Firestore
+  await FirebaseFirestore.instance.collection('notifications').add({
+    'title': title,
+    'message': body,
+    'data': data,
+    'createdAt': FieldValue.serverTimestamp(),
+    'seen': false,
+  });
+
+  // Show local notification
+  const androidDetails = AndroidNotificationDetails(
+    'vendor_notifications',
+    'Vendor Notifications',
+    channelDescription: 'Channel for vendor booking notifications',
+    importance: Importance.max,
+    priority: Priority.high,
+  );
+
+  const platformDetails = NotificationDetails(android: androidDetails);
+
+  await flutterLocalNotificationsPlugin.show(
+    DateTime.now().millisecondsSinceEpoch ~/ 1000,
+    title,
+    body,
+    platformDetails,
+    payload: jsonEncode(data),
+  );
 }
+
 
 
 // -----------------------------
@@ -72,6 +94,7 @@ Future<void> saveVendorToken() async {
   try {
     final token = await FirebaseMessaging.instance.getToken();
     if (token == null) return;
+   print('Vendor FCM token: $token');
 
     await FirebaseFirestore.instance
         .collection('appConfig')

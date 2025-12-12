@@ -89,9 +89,15 @@ exports.onSeatBooking = functions.firestore
     });
 
     // Send push notif to vendor
-    if (vendorToken) {
-      await admin.messaging().sendToDevice(vendorToken, notificationPayload);
-    }
+   if (vendorToken) {
+  try {
+    console.log('Sending notification to token:', vendorToken);
+    const response = await admin.messaging().sendToDevice(vendorToken, notificationPayload);
+    console.log('Notification sent successfully:', response);
+  } catch (err) {
+    console.error('Failed to send notification:', err);
+  }
+}
 
     return null;
   });

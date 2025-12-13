@@ -61,15 +61,30 @@ class NotificationScreen extends StatelessWidget {
               final createdAt = data['createdAt'] as Timestamp?;
               final seen = data['seen'] ?? false;
 
-              return Container(
+              // return Container(
+              //   margin: const EdgeInsets.only(bottom: 12),
+              //   padding: const EdgeInsets.all(16),
+              //   decoration: BoxDecoration(
+              //     color: seen ? Colors.white : Colors.blue.withOpacity(0.05),
+              //     borderRadius: BorderRadius.circular(12),
+              //     border: Border.all(
+              //       color: Colors.grey.shade200,
+              //     ),
+              //   ),
+              return GestureDetector(
+              onTap: () {
+                FirebaseFirestore.instance
+                    .collection('notifications')
+                    .doc(notifications[index].id)
+                    .update({'seen': true});
+              },
+              child: Container(
                 margin: const EdgeInsets.only(bottom: 12),
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: seen ? Colors.white : Colors.blue.withOpacity(0.05),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: Colors.grey.shade200,
-                  ),
+                  border: Border.all(color: Colors.grey.shade200),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -109,6 +124,7 @@ class NotificationScreen extends StatelessWidget {
                     ),
                   ],
                 ),
+              ),
               );
             },
           );

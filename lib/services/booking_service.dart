@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/movie.dart';
 import '../models/seat.dart';
 import '../models/slot.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class BookingService {
   static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -121,55 +122,92 @@ class BookingService {
   }
 
   static Future<void> bookSeatsWithTransaction({
-    required String movieId,
-    required String slotId,
-    required List<String> seatIds,
-  }) async {
-    if (seatIds.isEmpty) {
-      throw Exception('No seats selected');
-    }
-    
-    await _firestore.runTransaction((transaction) async {
-      final seatStatus = <String, bool>{};
-      
-      for (var seatId in seatIds) {
-        final seatRef = _firestore
-            .collection('movies')
-            .doc(movieId)
-            .collection('slots')
-            .doc(slotId)
-            .collection('seats')
-            .doc(seatId);
-        
-        final seatDoc = await transaction.get(seatRef);
-        
-        if (!seatDoc.exists) {
-          throw Exception('Seat $seatId not found');
-        }
-        
-        final isBooked = seatDoc.data()?['booked'] == true;
-        seatStatus[seatId] = isBooked;
-        
-        if (isBooked) {
-          throw Exception('Seat $seatId is already booked');
-        }
-      }
-      
-      for (var seatId in seatIds) {
-        final seatRef = _firestore
-            .collection('movies')
-            .doc(movieId)
-            .collection('slots')
-            .doc(slotId)
-            .collection('seats')
-            .doc(seatId);
-        
-        transaction.update(seatRef, {
-          'booked': true,
-          'bookedAt': FieldValue.serverTimestamp(),
-        });
-      }
-    });
+  required String movieId,
+  required String slotId,
+  required List<String> seatIds,
+}) async {
+  if (seatIds.isEmpty) {
+    throw Exception('No seats selected');
   }
+
+  final user = FirebaseAuth.instance.currentUser;
+  if (user == null) {
+    throw Exception('User not logged in');
+  }
+
+  await _firestore.runTransaction((transaction) async {
+    // 1️⃣ Check seats availability
+    for (var seatId in seatIds) {
+      final seatRef = _firestore
+          .collection('movies')
+          .doc(movieId)
+          .collection('slots')
+          .doc(slotId)
+          .collection('seats')
+          .doc(seatId);
+
+      final seatDoc = await transaction.get(seatRef);
+
+      if (!seatDoc.exists) {
+        throw Exception('Seat $seatId not found');
+      }
+
+      if (seatDoc.data()?['booked'] == true) {
+        throw Exception('Seat $seatId is already booked');
+      }
+    }
+
+    // 2️⃣ Book seats
+    for (var seatId in seatIds) {
+      final seatRef = _firestore
+          .collection('movies')
+          .doc(movieId)
+          .collection('slots')
+          .doc(slotId)
+          .collection('seats')
+          .doc(seatId);
+
+      transaction.update(seatRef, {
+        'booked': true,
+        'bookedAt': FieldValue.serverTimestamp(),
+        'userId': user.uid,
+      });
+    }
+
+    // 3️⃣ Fetch movie
+    final movieRef = _firestore.collection('movies').doc(movieId);
+    final movieSnap = await transaction.get(movieRef);
+
+    final movieTitle = movieSnap.data()?['title'] ?? 'Unknown movie';
+
+    // 4️⃣ Fetch slot
+    final slotRef = movieRef.collection('slots').doc(slotId);
+    final slotSnap = await transaction.get(slotRef);
+
+    final slotLabel = slotSnap.data()?['label'] ?? '';
+
+    // 5️⃣ Fetch user name
+    final userRef = _firestore.collection('users').doc(user.uid);
+    final userSnap = await transaction.get(userRef);
+
+    final customerName = userSnap.data()?['fullName'] ?? 'Customer';
+
+    // 6️⃣ Create booking document (🔥 THIS TRIGGERS FCM)
+    final bookingRef = _firestore.collection('bookings').doc();
+
+    transaction.set(bookingRef, {
+      'movieId': movieId,
+      'movieTitle': movieTitle,
+      'slotId': slotId,
+      'slotLabel': slotLabel,
+      'seats': seatIds,
+      'seatsCount': seatIds.length,
+      'customerId': user.uid,
+      'customerName': customerName,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+  });
+}
+
 
 }

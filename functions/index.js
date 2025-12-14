@@ -30,59 +30,72 @@ setGlobalOptions({ maxInstances: 10 });
 //   logger.info("Hello logs!", {structuredData: true});
 //   response.send("Hello from Firebase!");
 // });
+
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 
 admin.initializeApp();
 
+/**
+ * 🔔 Trigger when a new booking is created
+ * Path: bookings/{bookingId}
+ */
 exports.onNewBooking = functions.firestore
   .document("bookings/{bookingId}")
   .onCreate(async (snap, context) => {
-    const booking = snap.data();
+    try {
+      const booking = snap.data();
+      if (!booking) return null;
 
-    const {
-      movieTitle,
-      seatsCount,
-      customerName,
-    } = booking;
+      const {
+        movieTitle,
+        seatsCount,
+        customerName,
+      } = booking;
 
-    // 1️⃣ Get vendor FCM token
-    const vendorDoc = await admin
-      .firestore()
-      .collection("appConfig")
-      .doc("vendor")
-      .get();
+      // 1️⃣ Get vendor FCM token
+      const vendorDoc = await admin
+        .firestore()
+        .collection("appConfig")
+        .doc("vendor")
+        .get();
 
-    if (!vendorDoc.exists) return null;
+      if (!vendorDoc.exists) return null;
 
-    const token = vendorDoc.data().fcmToken;
-    if (!token) return null;
+      const token = vendorDoc.data()?.fcmToken;
+      if (!token) return null;
 
-    // 2️⃣ Create notification payload
-    const payload = {
-      notification: {
-        title: "New Booking 🎟️",
-        body: `${customerName} booked ${seatsCount} seats for ${movieTitle}`,
-      },
-      data: {
-        movieTitle: movieTitle,
-        seatsCount: seatsCount.toString(),
-        customerName: customerName,
+      // 2️⃣ Create FCM payload (IMPORTANT: route)
+      const message = {
+        token: token,
+        notification: {
+          title: "New Booking 🎟️",
+          body: `${customerName} booked ${seatsCount} seats for ${movieTitle}`,
+        },
+        data: {
+          route: "notifications", // ✅ REQUIRED FOR NAVIGATION
+          bookingId: context.params.bookingId,
+          movieTitle: movieTitle,
+          seatsCount: seatsCount.toString(),
+          customerName: customerName,
+        },
+      };
+
+      // 3️⃣ Send FCM
+      await admin.messaging().send(message);
+
+      // 4️⃣ Save notification to Firestore
+      await admin.firestore().collection("notifications").add({
+        title: "New Booking",
+        message: `${customerName} booked ${seatsCount} seats for ${movieTitle}`,
         bookingId: context.params.bookingId,
-      },
-    };
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        seen: false,
+      });
 
-    // 3️⃣ Send FCM
-    await admin.messaging().sendToDevice(token, payload);
-
-    // 4️⃣ Save notification to Firestore
-    await admin.firestore().collection("notifications").add({
-      title: "New Booking",
-      message: `${customerName} booked ${seatsCount} seats for ${movieTitle}`,
-      bookingId: context.params.bookingId,
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      seen: false,
-    });
-
-    return null;
+      return null;
+    } catch (error) {
+      console.error("❌ onNewBooking error:", error);
+      return null;
+    }
   });

@@ -27,6 +27,7 @@ class _AddMovieScreenState extends State<AddMovieScreen> {
   List<TextEditingController> slots = [TextEditingController()];
   File? selectedImage;
   Uint8List? webImage;
+
   Future pickFromGallery() async {
     final img = await ImagePicker().pickImage(
       source: ImageSource.gallery,
@@ -63,8 +64,8 @@ class _AddMovieScreenState extends State<AddMovieScreen> {
     context.read<AddMovieCubit>().addMovie(
       title: title.text.trim(),
       description: desc.text.trim(),
-      imageFile: selectedImage, // for mobile
-      webImage: webImage, // you need to update your cubit to accept this
+      imageFile: selectedImage,
+      webImage: webImage,
       duration: int.tryParse(duration.text.trim()) ?? 120,
       timeSlots: slotsList,
     );
@@ -169,18 +170,20 @@ class _AddMovieScreenState extends State<AddMovieScreen> {
                   ],
                 ),
                 const SizedBox(height: 10),
-                Column(
-                  children: List.generate(
-                    slots.length,
-                    (i) => Row(
-                      children: [
-                        Expanded(child: input(slots[i], "10:00 AM")),
-                        IconButton(
-                          onPressed: () => setState(() => slots.removeAt(i)),
-                          icon: const Icon(Icons.delete, color: Colors.red),
-                        ),
-                      ],
-                    ),
+                // ✅ FIX: Added spacing between time slots using ListView.separated
+                ListView.separated(
+                  shrinkWrap: true, // Important: allows ListView inside Column
+                  physics: const NeverScrollableScrollPhysics(), // Disable scrolling
+                  itemCount: slots.length,
+                  separatorBuilder: (context, index) => const SizedBox(height: 12), // ✅ Space between slots
+                  itemBuilder: (context, i) => Row(
+                    children: [
+                      Expanded(child: input(slots[i], "10:00 AM")),
+                      IconButton(
+                        onPressed: () => setState(() => slots.removeAt(i)),
+                        icon: const Icon(Icons.delete, color: Colors.red),
+                      ),
+                    ],
                   ),
                 ),
                 const SizedBox(height: 22),
@@ -258,6 +261,7 @@ class _AddMovieScreenState extends State<AddMovieScreen> {
       fontWeight: FontWeight.bold,
     ),
   );
+
   Widget cancelBtn() => OutlinedButton(
     onPressed: () => Navigator.pop(context),
     style: OutlinedButton.styleFrom(
@@ -269,6 +273,7 @@ class _AddMovieScreenState extends State<AddMovieScreen> {
       style: TextStyle(color: Colors.white70, fontSize: 15),
     ),
   );
+
   Widget addBtn() => ElevatedButton(
     onPressed: () {
       if (saveMovie()) Navigator.pop(context);

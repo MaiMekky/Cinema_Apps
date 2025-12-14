@@ -9,15 +9,18 @@ import '/cubit/movies/movies_cubit.dart';
 import '/cubit/add_movie/add_movie_cubit.dart';
 import '/cubit/dashboard/dashboard_cubit.dart';
 import 'screens/vendor_dashboard_screen.dart';
+import 'screens/notification_screen.dart'; // ✅ IMPORT
 import 'firebase_options.dart';
+
+/// 🌍 Global Navigator Key
+final GlobalKey<NavigatorState> navigatorKey =
+    GlobalKey<NavigatorState>();
 
 /// 🔔 Save vendor FCM token to Firestore
 Future<void> saveVendorToken() async {
   try {
     final token = await FirebaseMessaging.instance.getToken();
     if (token == null) return;
-
-    debugPrint('📲 Vendor FCM token: $token');
 
     await FirebaseFirestore.instance
         .collection('appConfig')
@@ -38,17 +41,17 @@ Future<void> main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  // 🔑 Ask notification permission
+  // 🔑 Request notification permission
   await FirebaseMessaging.instance.requestPermission(
     alert: true,
     badge: true,
     sound: true,
   );
 
-  // ✅ Save vendor FCM token
+  // ✅ Save token
   await saveVendorToken();
 
-  // 🔄 Handle token refresh
+  // 🔄 Token refresh
   FirebaseMessaging.instance.onTokenRefresh.listen((newToken) async {
     await FirebaseFirestore.instance
         .collection('appConfig')
@@ -58,6 +61,23 @@ Future<void> main() async {
       'updatedAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
   });
+
+  // 📲 App opened from background
+  FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+    if (message.data['route'] == 'notifications') {
+      navigatorKey.currentState?.pushNamed('/notifications');
+    }
+  });
+
+  // 📲 App opened from terminated state
+  final initialMessage =
+      await FirebaseMessaging.instance.getInitialMessage();
+
+  if (initialMessage?.data['route'] == 'notifications') {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      navigatorKey.currentState?.pushNamed('/notifications');
+    });
+  }
 
   final repo = MoviesRepository();
 
@@ -79,6 +99,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: navigatorKey, // ✅ VERY IMPORTANT
       debugShowCheckedModeBanner: false,
       title: 'Vendor Dashboard',
       theme: ThemeData(
@@ -86,6 +107,9 @@ class MyApp extends StatelessWidget {
         scaffoldBackgroundColor: const Color(0xFF111B2B),
       ),
       home: const VendorDashboardScreen(),
+      routes: {
+        '/notifications': (_) => const NotificationScreen(),
+      },
     );
   }
 }

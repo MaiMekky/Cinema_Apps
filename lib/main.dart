@@ -1,22 +1,74 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 import '/services/movies_repository.dart';
 import '/cubit/movies/movies_cubit.dart';
 import '/cubit/add_movie/add_movie_cubit.dart';
 import '/cubit/dashboard/dashboard_cubit.dart';
 import 'screens/vendor_dashboard_screen.dart';
-import 'screens/notification_screen.dart'; // ✅ IMPORT
+import 'screens/notification_screen.dart';
+import 'screens/booking_details_screen.dart';
 import 'firebase_options.dart';
 
 /// 🌍 Global Navigator Key
-final GlobalKey<NavigatorState> navigatorKey =
-    GlobalKey<NavigatorState>();
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
-/// 🔔 Save vendor FCM token to Firestore
+/// 🔔 Local notifications plugin
+final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
+    FlutterLocalNotificationsPlugin();
+
+/// 🔔 Background message handler
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+
+  final title = message.notification?.title ?? message.data['title'] ?? 'New Booking';
+  final body = message.notification?.body ?? message.data['body'] ?? '';
+
+  await FirebaseFirestore.instance.collection('notifications').add({
+    'title': title,
+    'message': body,
+    'data': message.data,
+    'bookingId': message.data['bookingId'],
+    'createdAt': FieldValue.serverTimestamp(),
+    'seen': false,
+  });
+}
+
+/// 🔧 Setup WhatsApp-style notifications
+Future<void> _setupLocalNotifications() async {
+  const AndroidInitializationSettings androidSettings =
+      AndroidInitializationSettings('@mipmap/ic_launcher');
+
+  const InitializationSettings initSettings =
+      InitializationSettings(android: androidSettings);
+
+  await flutterLocalNotificationsPlugin.initialize(
+    initSettings,
+    onDidReceiveNotificationResponse: (NotificationResponse response) async {
+      navigatorKey.currentState?.pushNamed('/notifications');
+    },
+  );
+
+  const AndroidNotificationChannel channel = AndroidNotificationChannel(
+    'vendor_notifications',
+    'Vendor Notifications',
+    description: 'Booking notifications',
+    importance: Importance.max,
+  );
+
+  await flutterLocalNotificationsPlugin
+      .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+      ?.createNotificationChannel(channel);
+}
+
+/// 🔔 Save vendor FCM token
 Future<void> saveVendorToken() async {
   try {
     final token = await FirebaseMessaging.instance.getToken();
@@ -34,24 +86,25 @@ Future<void> saveVendorToken() async {
   }
 }
 
+void _handleNavigation(Map<String, dynamic> data) {
+  navigatorKey.currentState?.pushNamed('/notifications');
+}
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  await _setupLocalNotifications();
+  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
-  // 🔑 Request notification permission
   await FirebaseMessaging.instance.requestPermission(
     alert: true,
     badge: true,
     sound: true,
   );
 
-  // ✅ Save token
   await saveVendorToken();
 
-  // 🔄 Token refresh
   FirebaseMessaging.instance.onTokenRefresh.listen((newToken) async {
     await FirebaseFirestore.instance
         .collection('appConfig')
@@ -62,20 +115,47 @@ Future<void> main() async {
     }, SetOptions(merge: true));
   });
 
-  // 📲 App opened from background
-  FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-    if (message.data['route'] == 'notifications') {
-      navigatorKey.currentState?.pushNamed('/notifications');
-    }
+  FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
+    final title = message.notification?.title ?? message.data['title'] ?? 'New Booking';
+    final body = message.notification?.body ?? message.data['body'] ?? '';
+
+    const androidDetails = AndroidNotificationDetails(
+      'vendor_notifications',
+      'Vendor Notifications',
+      channelDescription: 'Booking notifications',
+      importance: Importance.max,
+      priority: Priority.high,
+    );
+
+    const platformDetails = NotificationDetails(android: androidDetails);
+
+    await flutterLocalNotificationsPlugin.show(
+      DateTime.now().millisecondsSinceEpoch ~/ 1000,
+      title,
+      body,
+      platformDetails,
+      payload: jsonEncode(message.data),
+    );
+
+    await FirebaseFirestore.instance.collection('notifications').add({
+      'title': title,
+      'message': body,
+      'data': message.data,
+      'bookingId': message.data['bookingId'],
+      'createdAt': FieldValue.serverTimestamp(),
+      'seen': false,
+    });
   });
 
-  // 📲 App opened from terminated state
-  final initialMessage =
-      await FirebaseMessaging.instance.getInitialMessage();
+  // ✅ الحل هنا!
+  FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+    _handleNavigation(message.data);
+  });
 
-  if (initialMessage?.data['route'] == 'notifications') {
+  final initialMessage = await FirebaseMessaging.instance.getInitialMessage();
+  if (initialMessage != null) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      navigatorKey.currentState?.pushNamed('/notifications');
+      _handleNavigation(initialMessage.data);
     });
   }
 
@@ -99,7 +179,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      navigatorKey: navigatorKey, // ✅ VERY IMPORTANT
+      navigatorKey: navigatorKey,
       debugShowCheckedModeBanner: false,
       title: 'Vendor Dashboard',
       theme: ThemeData(
@@ -109,6 +189,10 @@ class MyApp extends StatelessWidget {
       home: const VendorDashboardScreen(),
       routes: {
         '/notifications': (_) => const NotificationScreen(),
+        '/booking-details': (context) {
+          final args = ModalRoute.of(context)?.settings.arguments as String?;
+          return BookingDetailsScreen(bookingId: args ?? '');
+        },
       },
     );
   }

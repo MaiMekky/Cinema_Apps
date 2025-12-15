@@ -30,72 +30,89 @@ setGlobalOptions({ maxInstances: 10 });
 //   logger.info("Hello logs!", {structuredData: true});
 //   response.send("Hello from Firebase!");
 // });
-
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 
 admin.initializeApp();
 
-/**
- * 🔔 Trigger when a new booking is created
- * Path: bookings/{bookingId}
- */
-exports.onNewBooking = functions.firestore
-  .document("bookings/{bookingId}")
-  .onCreate(async (snap, context) => {
-    try {
-      const booking = snap.data();
-      if (!booking) return null;
+setGlobalOptions({ maxInstances: 10 });
 
-      const {
-        movieTitle,
-        seatsCount,
-        customerName,
-      } = booking;
+// 🔔 HTTP Cloud Function (Spark Plan OK!)
+exports.sendVendorNotification = functions.https.onRequest(async (req, res) => {
+  // CORS
+  res.set('Access-Control-Allow-Origin', '*');
+  res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.set('Access-Control-Allow-Headers', 'Content-Type');
 
-      // 1️⃣ Get vendor FCM token
-      const vendorDoc = await admin
-        .firestore()
-        .collection("appConfig")
-        .doc("vendor")
-        .get();
+  if (req.method === 'OPTIONS') {
+    res.status(204).send('');
+    return;
+  }
 
-      if (!vendorDoc.exists) return null;
-
-      const token = vendorDoc.data()?.fcmToken;
-      if (!token) return null;
-
-      // 2️⃣ Create FCM payload (IMPORTANT: route)
-      const message = {
-        token: token,
-        notification: {
-          title: "New Booking 🎟️",
-          body: `${customerName} booked ${seatsCount} seats for ${movieTitle}`,
-        },
-        data: {
-          route: "notifications", // ✅ REQUIRED FOR NAVIGATION
-          bookingId: context.params.bookingId,
-          movieTitle: movieTitle,
-          seatsCount: seatsCount.toString(),
-          customerName: customerName,
-        },
-      };
-
-      // 3️⃣ Send FCM
-      await admin.messaging().send(message);
-
-      // 4️⃣ Save notification to Firestore
-      await admin.firestore().collection("notifications").add({
-        title: "New Booking",
-        message: `${customerName} booked ${seatsCount} seats for ${movieTitle}`,
-        bookingId: context.params.bookingId,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        seen: false,
-      });
-
-      return null;
-    } catch (error) {
-      console.error("❌ onNewBooking error:", error);
-      return null;
+  try {
+    if (req.method !== 'POST') {
+      res.status(405).json({ error: 'Method Not Allowed' });
+      return;
     }
-  });
+
+    const { bookingId, movieTitle, seatsCount, customerName } = req.body;
+
+    if (!bookingId || !movieTitle || !seatsCount || !customerName) {
+      res.status(400).json({ error: 'Missing required fields' });
+      return;
+    }
+
+    // 1️⃣ Get vendor token
+    const vendorDoc = await admin.firestore()
+      .collection('appConfig')
+      .doc('vendor')
+      .get();
+
+    if (!vendorDoc.exists || !vendorDoc.data()?.fcmToken) {
+      console.error('❌ Vendor token not found');
+      res.status(404).json({ error: 'Vendor token not found' });
+      return;
+    }
+
+    const token = vendorDoc.data().fcmToken;
+    console.log('✅ Vendor token found');
+
+    // 2️⃣ Send FCM
+    const message = {
+      token: token,
+      notification: {
+        title: '🎟️ New Booking!',
+        body: `${customerName} booked ${seatsCount} seats for "${movieTitle}"`,
+      },
+      data: {
+        route: 'notifications',
+        bookingId: bookingId,
+        movieTitle: movieTitle,
+        seatsCount: seatsCount.toString(),
+        customerName: customerName,
+      },
+      android: {
+        priority: 'high',
+        notification: { channelId: 'vendor_notifications' },
+      },
+    };
+
+    const response = await admin.messaging().send(message);
+    console.log('✅ FCM sent:', response);
+
+    // 3️⃣ Save notification
+    await admin.firestore().collection('notifications').add({
+      title: 'New Booking',
+      message: `${customerName} booked ${seatsCount} seats for ${movieTitle}`,
+      bookingId: bookingId,
+      data: message.data,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      seen: false,
+    });
+
+    res.status(200).json({ success: true, messageId: response });
+  } catch (error) {
+    console.error('❌ Error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});

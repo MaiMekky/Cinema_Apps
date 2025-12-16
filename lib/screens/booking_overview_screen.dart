@@ -126,52 +126,100 @@ class _BookingOverviewScreenState extends State<BookingOverviewScreen> {
     );
   }
 
-  Widget _buildSeatLayout(List<bool> seatStatus) {
-    final rows = ["A", "B", "C", "D", "H"];
-    final seatsPerRow = {"A": 9, "B": 9, "C": 9, "D": 9, "H": 11};
-    int index = 0;
+ Widget _buildSeatLayout(List<bool> seatStatus) {
+  final rows = ["A", "B", "C", "D", "H"];
+  final seatsPerRow = {"A": 9, "B": 9, "C": 9, "D": 9, "H": 11};
+  int index = 0; // global seat index: 0..46
 
-    return Column(children: rows.map((rowLetter) {
+  return Column(
+    children: rows.map((rowLetter) {
       final seatCount = seatsPerRow[rowLetter]!;
       final isLastRow = rowLetter == "H";
 
       return Padding(
         padding: const EdgeInsets.only(bottom: 16),
-        child: Row(crossAxisAlignment: CrossAxisAlignment.center, mainAxisAlignment: MainAxisAlignment.center, children: [
-          Text(rowLetter, style: const TextStyle(color: Colors.white70, fontSize: 16, fontWeight: FontWeight.bold)),
-          const SizedBox(width: 10),
-          Expanded(
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: List.generate(seatCount + (isLastRow ? 0 : 2), (i) {
-                  if (!isLastRow && (i == 4 || i == 5)) return const SizedBox(width: 12);
-
-                  int seatNum = i;
-                  if (!isLastRow && i >= 6) seatNum -= 2;
-                  if (seatNum >= seatCount) return const SizedBox.shrink();
-
-                  if (index >= seatStatus.length) return const SizedBox.shrink();
-                  final isBooked = seatStatus[index];
-
-                  final seat = Container(
-                    width: 25,
-                    height: 25,
-                    margin: const EdgeInsets.symmetric(horizontal: 2),
-                    decoration: BoxDecoration(color: isBooked ? Colors.redAccent : AppColors.card, borderRadius: BorderRadius.circular(8), border: Border.all(color: isBooked ? Colors.redAccent : Colors.white24, width: 1)),
-                    child: Center(child: Text("${seatNum + 1}", style: TextStyle(color: isBooked ? Colors.white : Colors.white70, fontSize: 12, fontWeight: FontWeight.bold))),
-                  );
-
-                  index++;
-                  return seat;
-                }),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              rowLetter,
+              style: const TextStyle(
+                color: Colors.white70,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
               ),
             ),
-          ),
-        ]),
+            const SizedBox(width: 10),
+            Expanded(
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: List.generate(
+                    seatCount + (isLastRow ? 0 : 2),
+                    (i) {
+                      // middle gap for non‑last rows
+                      if (!isLastRow && (i == 4 || i == 5)) {
+                        return const SizedBox(width: 12);
+                      }
+
+                      int seatNum = i;
+                      if (!isLastRow && i >= 6) {
+                        seatNum -= 2;
+                      }
+                      if (seatNum >= seatCount) {
+                        return const SizedBox.shrink();
+                      }
+
+                      // no more seats in status list
+                      if (index >= seatStatus.length) {
+                        return const SizedBox.shrink();
+                      }
+
+                      final isBooked = seatStatus[index];
+                      final seatWidget = Container(
+                        width: 25,
+                        height: 25,
+                        margin: const EdgeInsets.symmetric(horizontal: 2),
+                        decoration: BoxDecoration(
+                          color:
+                              isBooked ? Colors.redAccent : AppColors.card,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: isBooked
+                                ? Colors.redAccent
+                                : Colors.white24,
+                            width: 1,
+                          ),
+                        ),
+                        child: Center(
+                          // GLOBAL NUMBERING: 1..47
+                          child: Text(
+                            "${index + 1}",
+                            style: TextStyle(
+                              color: isBooked
+                                  ? Colors.white
+                                  : Colors.white70,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      );
+
+                      index++; // advance global index ONLY for real seats
+                      return seatWidget;
+                    },
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       );
-    }).toList());
-  }
+    }).toList(),
+  );
+}
 
   Widget _buildLegend() {
     return Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [

@@ -20,7 +20,7 @@ class VendorDashboardScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppColors.background, // dark navy
       appBar: PreferredSize(
-        preferredSize: Size.fromHeight(isSmallScreen ? 90 : 100),
+        preferredSize: Size.fromHeight(isSmallScreen ? 70 : 90),
         child: AppBar(
           automaticallyImplyLeading: false,
           backgroundColor: AppColors.background,

@@ -1,6 +1,6 @@
 import 'dart:convert';
-import 'package:http/http.dart' as http;
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:googleapis_auth/auth_io.dart';
 import '../models/movie.dart';
 import '../models/seat.dart';
 import '../models/slot.dart';
@@ -9,10 +9,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 class BookingService {
   static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  // 🔥 FCM REST API URL
-  static const String _fcmUrl = 'https://fcm.googleapis.com/fcm/send';
-  // 👈 حط Server Key هنا من Firebase Console → Project Settings → Cloud Messaging
-  static const String _serverKey = '812333354318';
+  
+
 
   static Future<Movie> getMovie(String movieId) async {
     final doc = await _firestore.collection('movies').doc(movieId).get();
@@ -133,6 +131,8 @@ class BookingService {
     required String slotId,
     required List<String> seatIds,
   }) async {
+    print('📝 Starting booking process...');
+    
     if (seatIds.isEmpty) {
       throw Exception('No seats selected');
     }
@@ -142,149 +142,247 @@ class BookingService {
       throw Exception('User not logged in');
     }
 
-    // 🔥 Variables للـ notification (خارج الـ transaction)
-    String movieTitle = 'Unknown movie';
-    String customerName = 'Customer';
-    String bookingId = '';
+    print('👤 User: ${user.email}');
+    print('🎬 Movie ID: $movieId');
+    print('🕐 Slot ID: $slotId');
+    print('🪑 Seats: ${seatIds.length}');
 
-    await _firestore.runTransaction((transaction) async {
-      // 1️⃣ Check seats availability
-      for (var seatId in seatIds) {
-        final seatRef = _firestore
-            .collection('movies')
-            .doc(movieId)
-            .collection('slots')
-            .doc(slotId)
-            .collection('seats')
-            .doc(seatId);
+    try {
+      // ✅ SAVE SEAT COUNT BEFORE TRANSACTION (THIS IS THE FIX!)
+      final int seatsCount = seatIds.length;
+      print('💾 Saved seat count BEFORE transaction: $seatsCount');
 
-        final seatDoc = await transaction.get(seatRef);
+      // ✅ Variables to hold data for notification
+      late String movieTitle;
+      late String slotLabel;
+      late String customerName;
+      late String bookingId;
+      
+      await _firestore.runTransaction((transaction) async {
+        // ✅ STEP 1: READ ALL DATA FIRST
+        print('📖 Reading all necessary data...');
 
-        if (!seatDoc.exists) {
-          throw Exception('Seat $seatId not found');
+        // Read seat documents
+        final seatDocuments = <DocumentSnapshot>[];
+        for (var seatId in seatIds) {
+          final seatRef = _firestore
+              .collection('movies')
+              .doc(movieId)
+              .collection('slots')
+              .doc(slotId)
+              .collection('seats')
+              .doc(seatId);
+          seatDocuments.add(await transaction.get(seatRef));
         }
 
-        if (seatDoc.data()?['booked'] == true) {
-          throw Exception('Seat $seatId is already booked');
+        // Read movie document
+        final movieRef = _firestore.collection('movies').doc(movieId);
+        final movieSnap = await transaction.get(movieRef);
+
+        // Read slot document
+        final slotRef = movieRef.collection('slots').doc(slotId);
+        final slotSnap = await transaction.get(slotRef);
+
+        // Read user document
+        final userRef = _firestore.collection('users').doc(user.uid);
+        final userSnap = await transaction.get(userRef);
+
+        print('✅ All data read successfully');
+
+        // ✅ STEP 2: VALIDATE DATA
+        print('🔍 Validating data...');
+
+        // Check seat availability
+        for (var i = 0; i < seatDocuments.length; i++) {
+          final seatDoc = seatDocuments[i];
+          if (!seatDoc.exists) {
+            throw Exception('Seat ${seatIds[i]} not found');
+          }
+          if (seatDoc.data() != null) {
+            final data = seatDoc.data() as Map<String, dynamic>;
+            if (data['booked'] == true) {
+              throw Exception('Seat ${seatIds[i]} is already booked');
+            }
+          }
         }
-      }
 
-      // 2️⃣ Book seats
-      for (var seatId in seatIds) {
-        final seatRef = _firestore
-            .collection('movies')
-            .doc(movieId)
-            .collection('slots')
-            .doc(slotId)
-            .collection('seats')
-            .doc(seatId);
+        // Check movie exists
+        if (!movieSnap.exists) {
+          throw Exception('Movie not found');
+        }
 
-        transaction.update(seatRef, {
-          'booked': true,
-          'bookedAt': FieldValue.serverTimestamp(),
-          'userId': user.uid,
+        // Check slot exists
+        if (!slotSnap.exists) {
+          throw Exception('Slot not found');
+        }
+
+        print('✅ All validations passed');
+
+        // ✅ STEP 3: EXTRACT DATA
+        print('📊 Extracting data...');
+
+        movieTitle = movieSnap.data()?['title'] ?? 'Unknown movie';
+        slotLabel = slotSnap.data()?['label'] ?? 'Unknown slot';
+        customerName = userSnap.data()?['fullName'] ?? user.email ?? 'Customer';
+
+        print('✅ Movie: $movieTitle');
+        print('✅ Slot: $slotLabel');
+        print('✅ Customer: $customerName');
+
+        // ✅ STEP 4: WRITE ALL DATA
+        print('✍️ Writing data to database...');
+
+        // Book all seats
+        for (var seatId in seatIds) {
+          final seatRef = _firestore
+              .collection('movies')
+              .doc(movieId)
+              .collection('slots')
+              .doc(slotId)
+              .collection('seats')
+              .doc(seatId);
+
+          transaction.update(seatRef, {
+            'booked': true,
+            'bookedAt': FieldValue.serverTimestamp(),
+            'userId': user.uid,
+          });
+        }
+
+        // Create booking document
+        final bookingRef = _firestore.collection('bookings').doc();
+        bookingId = bookingRef.id;
+
+        transaction.set(bookingRef, {
+          'bookingId': bookingRef.id,
+          'movieId': movieId,
+          'movieTitle': movieTitle,
+          'slotId': slotId,
+          'slotLabel': slotLabel,
+          'seats': seatIds,
+          'seatsCount': seatsCount, // ✅ Use the saved count HERE
+          'customerId': user.uid,
+          'customerEmail': user.email,
+          'customerName': customerName,
+          'createdAt': FieldValue.serverTimestamp(),
+          'status': 'confirmed',
         });
-      }
 
-      // 3️⃣ Fetch movie
-      final movieRef = _firestore.collection('movies').doc(movieId);
-      final movieSnap = await transaction.get(movieRef);
-      movieTitle = movieSnap.data()?['title'] ?? 'Unknown movie';
-
-      // 4️⃣ Fetch slot
-      final slotRef = movieRef.collection('slots').doc(slotId);
-      final slotSnap = await transaction.get(slotRef);
-      // slotLabel مش محتاجينها دلوقتي
-
-      // 5️⃣ Fetch user name
-      final userRef = _firestore.collection('users').doc(user.uid);
-      final userSnap = await transaction.get(userRef);
-      customerName = userSnap.data()?['fullName'] ?? 'Customer';
-
-      // 6️⃣ Create booking document
-      final bookingRef = _firestore.collection('bookings').doc();
-      bookingId = bookingRef.id;  // 🔥 احفظ الـ ID
-
-      transaction.set(bookingRef, {
-        'movieId': movieId,
-        'movieTitle': movieTitle,
-        'slotId': slotId,
-        'seats': seatIds,
-        'seatsCount': seatIds.length,
-        'customerId': user.uid,
-        'customerName': customerName,
-        'createdAt': FieldValue.serverTimestamp(),
-        'bookingId': bookingRef.id,
+        print('✅ Booking document created: ${bookingRef.id}');
       });
-    });
 
-    // 🔥 7️⃣ Send notification AFTER transaction (خارج الـ transaction)
-    await _sendVendorNotification(bookingId, movieTitle, seatIds.length, customerName);
+      print('🎉 Booking completed successfully!');
+      print('📋 Booking ID: $bookingId');
+      print('📊 Total Seats Booked: $seatsCount'); // ✅ Log the saved count
+      
+      // 🔔 SEND NOTIFICATION AFTER BOOKING - USE THE SAVED COUNT
+      await _sendVendorNotification(
+        bookingId: bookingId,
+        movieTitle: movieTitle,
+        slotLabel: slotLabel,
+        customerName: customerName,
+        seatsCount: seatsCount, // ✅ PASS THE SAVED COUNT HERE!
+      );
+      
+    } catch (e) {
+      print('❌ Booking error: $e');
+      throw Exception('Booking failed: $e');
+    }
   }
 
-  // 🔔 FCM REST API Notification (Spark Plan OK!)
-  static Future<void> _sendVendorNotification(
-    String bookingId,
-    String movieTitle,
-    int seatsCount,
-    String customerName,
-  ) async {
+  // 🔔 Send notification to vendor using FCM V1 API with HARDCODED TOKEN
+  static Future<void> _sendVendorNotification({
+    required String bookingId,
+    required String movieTitle,
+    required String slotLabel,
+    required String customerName,
+    required int seatsCount,
+  }) async {
     try {
-      if (_serverKey == 'YOUR_SERVER_KEY_HERE') {
-        print('⚠️  Please set your FCM Server Key in _serverKey');
-        return;
-      }
+      print('🔔 Preparing to send notification to VENDOR...');
+      print('📋 Booking ID: $bookingId');
+      print('🎬 Movie: $movieTitle');
+      print('👤 Customer: $customerName');
+      print('🪑 Seats: $seatsCount');
 
-      print('🔥 Sending FCM notification to vendor...');
+      print('✅ Using hardcoded vendor token');
 
-      // Get vendor token
-      final vendorDoc = await _firestore.collection('appConfig').doc('vendor').get();
-      if (!vendorDoc.exists || vendorDoc.data()?['fcmToken'] == null) {
-        print('❌ Vendor token not found in appConfig/vendor');
-        return;
-      }
+      // Get access token using Service Account
+      print('🔑 Getting access token from Google...');
+      final credentials = ServiceAccountCredentials.fromJson(serviceAccountJson);
+      final scopes = ['https://www.googleapis.com/auth/firebase.messaging'];
+      final authClient = await clientViaServiceAccount(credentials, scopes);
 
-      final vendorToken = vendorDoc.data()!['fcmToken'] as String;
+      // FCM V1 API URL
+      const String fcmUrl = 
+          'https://fcm.googleapis.com/v1/projects/cinemaapps-5f65f/messages:send';
 
-      // FCM payload
+      // ✅ Create notification payload for VENDOR with HARDCODED TOKEN
       final payload = {
-        'to': vendorToken,
-        'notification': {
-          'title': '🎟️ New Booking!',
-          'body': '$customerName booked $seatsCount seats for "$movieTitle"',
-        },
-        'data': {
-          'route': 'notifications',
-          'bookingId': bookingId,
-          'movieTitle': movieTitle,
-          'seatsCount': seatsCount.toString(),
-          'customerName': customerName,
-        },
-        'android': {
-          'priority': 'high',
+        'message': {
+          'token': VENDOR_FCM_TOKEN,  // ✅ HARDCODED VENDOR TOKEN
           'notification': {
-            'channelId': 'vendor_notifications',
+            'title': '🎟️ New Booking Received!',
+            'body': '$customerName booked $seatsCount seats for "$movieTitle"',
           },
-        },
+          'data': {
+            'bookingId': bookingId,
+            'movieTitle': movieTitle,
+            'slotLabel': slotLabel,
+            'customerName': customerName,
+            'seatsCount': seatsCount.toString(),
+            'notificationType': 'new_booking',
+          },
+          'android': {
+            'priority': 'HIGH',
+            'notification': {
+              'channel_id': 'vendor_notifications',
+              'sound': 'default',
+            },
+          },
+          'apns': {
+            'headers': {
+              'apns-priority': '10',
+            },
+            'payload': {
+              'aps': {
+                'alert': {
+                  'title': '🎟️ New Booking Received!',
+                  'body': '$customerName booked $seatsCount seats for "$movieTitle"',
+                },
+                'badge': 1,
+                'sound': 'default',
+              }
+            }
+          }
+        }
       };
 
-      final response = await http.post(
-        Uri.parse(_fcmUrl),
+      print('📤 Sending notification via FCM V1 API...');
+      
+      final response = await authClient.post(
+        Uri.parse(fcmUrl),
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': 'key=$_serverKey',
         },
         body: jsonEncode(payload),
       );
 
+      authClient.close();
+
       if (response.statusCode == 200) {
-        print('✅ Vendor notification sent successfully! 🎉');
+        print('✅ Notification sent successfully to VENDOR! 🎉');
+        print('📋 Booking ID: $bookingId');
+        print('📱 Vendor will receive notification');
+        print('-------------------------------------------');
       } else {
-        print('❌ FCM failed: ${response.statusCode}');
-        print('Response: ${response.body}');
+        print('❌ Failed to send notification');
+        print('Status Code: ${response.statusCode}');
+        print('Error: ${response.body}');
       }
     } catch (e) {
       print('❌ Notification error: $e');
+      rethrow;
     }
   }
 }

@@ -123,13 +123,28 @@ class _BookingPageState extends State<BookingPage> {
     }
 
     try {
+      // ✅ STEP 1: SAVE ALL DATA BEFORE BOOKING
+      final selectedSeatIds = List<String>.from(_selectedSeats);  // Create a copy!
+      final selectedSlot = _selectedSlot!;
+      final movieTitle = _movie!.title;
+      final slotLabel = selectedSlot.label;
+      final seatsCount = selectedSeatIds.length;  // Save the count
+
+      print('📋 Booking initiated');
+      print('   Seats: $selectedSeatIds');
+      print('   Count: $seatsCount');
+      print('   Movie: $movieTitle');
+      print('   Slot: $slotLabel');
+
+      // ✅ STEP 2: CHECK AVAILABILITY
       final isAvailable = await BookingService.checkSeatsAvailability(
         movieId: widget.movieId,
-        slotId: _selectedSlot!.id,
-        seatIds: _selectedSeats,
+        slotId: selectedSlot.id,
+        seatIds: selectedSeatIds,
       );
 
       if (!isAvailable) {
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
@@ -140,42 +155,107 @@ class _BookingPageState extends State<BookingPage> {
         return;
       }
 
+      // ✅ STEP 3: BOOK SEATS
       await BookingService.bookSeatsWithTransaction(
         movieId: widget.movieId,
-        slotId: _selectedSlot!.id,
-        seatIds: _selectedSeats,
+        slotId: selectedSlot.id,
+        seatIds: selectedSeatIds,
       );
+
+      // ✅ STEP 4: SHOW SUCCESS DIALOG WITH SAVED DATA
+      if (!mounted) return;
 
       showDialog(
         context: context,
-        builder: (context) => AlertDialog(
+        barrierDismissible: false,
+        builder: (dialogContext) => AlertDialog(
           backgroundColor: AppColors.card,
           title: const Text(
-            'Booking Confirmed!',
-            style: TextStyle(color: AppColors.textPrimary),
+            'Booking Confirmed! ✅',
+            style: TextStyle(
+              color: AppColors.textPrimary,
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+            ),
           ),
-          content: Text(
-            'You have successfully booked ${_selectedSeats.length} seat(s) for ${_movie?.title}\n\nTime: ${_selectedSlot?.label}\nSeats: ${_selectedSeats.join(', ')}',
-            style: const TextStyle(color: AppColors.textSecondary),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'You have successfully booked $seatsCount seat(s)',
+                  style: const TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Movie: $movieTitle',
+                  style: const TextStyle(color: AppColors.textSecondary),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Time: $slotLabel',
+                  style: const TextStyle(color: AppColors.textSecondary),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Seats: ${selectedSeatIds.join(', ')}',
+                  style: const TextStyle(color: AppColors.textSecondary),
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.red.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.red, width: 1),
+                  ),
+                  child: Text(
+                    'Total: \$${seatsCount * 15}',
+                    style: const TextStyle(
+                      color: Colors.red,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
           actions: [
             TextButton(
               onPressed: () {
-                Navigator.pop(context);
-                Navigator.pop(context);
+                Navigator.pop(dialogContext);  // Close dialog
+                Navigator.pop(context);  // Go back to previous screen
+                
+                // ✅ Clear selected seats after navigation
+                setState(() {
+                  _selectedSeats.clear();
+                });
               },
-              child: const Text('OK', style: TextStyle(color: Colors.red)),
+              child: const Text(
+                'OK',
+                style: TextStyle(
+                  color: Colors.red,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ),
           ],
         ),
       );
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Booking failed: $e')));
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Booking failed: $e')),
+      );
     }
   }
-
   int get _availableSeats {
     return _seats.values.where((seat) => !seat.booked).length;
   }
@@ -489,58 +569,61 @@ class _BookingPageState extends State<BookingPage> {
     Map<String, List<Seat>> seatRows,
     List<String> rowLetters,
   ) {
-    return Column(
-      children: rowLetters.map((rowLetter) {
-        final rowSeats = seatRows[rowLetter] ?? [];
-        final isWideRow =
-            rowLetter == 'H'; 
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Column(
+        children: rowLetters.map((rowLetter) {
+          final rowSeats = seatRows[rowLetter] ?? [];
+          final isWideRow = rowLetter == 'H';
 
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 16),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                rowLetter,
-                style: TextStyle(
-                  color: AppColors.textPrimary,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  rowLetter,
+                  style: TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 10),
-
-              if (!isWideRow)
-                Row(
-                  children: [
-                    Row(
-                      children: rowSeats.take(4).map((seat) {
-                        return _buildSeatWidget(seat);
-                      }).toList(),
-                    ),
-
-                    const SizedBox(width: 60),
-
-                    Row(
-                      children: rowSeats.skip(4).map((seat) {
-                        return _buildSeatWidget(seat);
-                      }).toList(),
-                    ),
-                  ],
-                )
-              else
-                Row(
-                  children: rowSeats.map((seat) {
-                    return _buildSeatWidget(seat);
-                  }).toList(),
-                ),
-            ],
-          ),
-        );
-      }).toList(),
+                const SizedBox(width: 10),
+                if (!isWideRow)
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: rowSeats.take(4).map((seat) {
+                          return _buildSeatWidget(seat);
+                        }).toList(),
+                      ),
+                      const SizedBox(width: 60),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: rowSeats.skip(4).map((seat) {
+                          return _buildSeatWidget(seat);
+                        }).toList(),
+                      ),
+                    ],
+                  )
+                else
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: rowSeats.map((seat) {
+                      return _buildSeatWidget(seat);
+                    }).toList(),
+                  ),
+              ],
+            ),
+          );
+        }).toList(),
+      ),
     );
   }
-
   Widget _buildSeatWidget(Seat seat) {
     final isSelected = _selectedSeats.contains(seat.id);
     final isBooked = seat.booked;

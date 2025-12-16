@@ -45,12 +45,22 @@ class _AddMovieScreenState extends State<AddMovieScreen> {
 
   bool saveMovie() {
     if (selectedImage == null && webImage == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("Please upload movie image"),
-          backgroundColor: Colors.red,
-        ),
-      );
+ScaffoldMessenger.of(context).showSnackBar(
+  SnackBar(
+    content: Row(
+      children: [
+        const SizedBox(width: 12),
+        Expanded(child: Text("Please upload movie image", style: const TextStyle(fontSize: 15))),
+        Icon(Icons.close, color: Colors.white),
+      ],
+    ),
+    backgroundColor: Colors.red,
+    behavior: SnackBarBehavior.floating,
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    margin: const EdgeInsets.only(top: 80, left: 16, right: 16),
+  ),
+);
+
       return false;
     }
 
@@ -82,23 +92,39 @@ class _AddMovieScreenState extends State<AddMovieScreen> {
         backgroundColor: AppColors.background,
         elevation: 0,
       ),
-      body: BlocListener<AddMovieCubit, AddMovieState>(
-        listener: (context, state) {
-          if (state is AddMovieLoading) {
-            // optional: show loading overlay
-          } else if (state is AddMovieSuccess) {
-            ScaffoldMessenger.of(
-              context,
-            ).showSnackBar(const SnackBar(content: Text('Movie added')));
-          } else if (state is AddMovieFailure) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.message),
-                backgroundColor: Colors.red,
+      body:BlocListener<AddMovieCubit, AddMovieState>(
+  listener: (context, state) {
+    if (state is AddMovieLoading) {
+
+    } else if (state is AddMovieSuccess) {
+
+      Navigator.pop(context, 'movie_added');
+    } else if (state is AddMovieFailure) {
+  
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const SizedBox(width: 12),
+              Expanded(child: Text(state.message, style: const TextStyle(fontSize: 15))),
+              IconButton(
+                icon: const Icon(Icons.close, color: Colors.white),
+                onPressed: () => ScaffoldMessenger.of(context).hideCurrentSnackBar(),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
               ),
-            );
-          }
-        },
+            ],
+          ),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 3),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          margin: const EdgeInsets.only(top: 80, left: 16, right: 16),
+        ),
+      );
+    }
+  },
+
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(22),
           child: Form(
@@ -188,7 +214,7 @@ class _AddMovieScreenState extends State<AddMovieScreen> {
                 ),
                 const SizedBox(height: 22),
                 label("Number of Seats"),
-                input(seats, "47", keyboard: TextInputType.number),
+                input(seats, "47", keyboard: TextInputType.number, enabled: false),
                 const SizedBox(height: 35),
                 Row(
                   children: [
@@ -210,10 +236,12 @@ class _AddMovieScreenState extends State<AddMovieScreen> {
     String h, {
     int max = 1,
     keyboard = TextInputType.text,
+     bool enabled = true,
   }) => TextFormField(
     controller: c,
     maxLines: max,
     keyboardType: keyboard,
+     enabled: enabled,
     validator: (v) => v!.isEmpty ? "Required" : null,
     style: const TextStyle(color: Colors.white),
     decoration: InputDecoration(
@@ -274,17 +302,30 @@ class _AddMovieScreenState extends State<AddMovieScreen> {
     ),
   );
 
-  Widget addBtn() => ElevatedButton(
-    onPressed: () {
-      if (saveMovie()) Navigator.pop(context);
-    },
-    style: ElevatedButton.styleFrom(
-      backgroundColor: const Color(0xffE50914),
-      padding: const EdgeInsets.symmetric(vertical: 14),
-    ),
-    child: const Text(
-      "Add Movie",
-      style: TextStyle(color: Colors.white, fontSize: 16),
-    ),
-  );
+Widget addBtn() => BlocBuilder<AddMovieCubit, AddMovieState>(
+  builder: (context, state) {
+    return ElevatedButton(
+onPressed: state is AddMovieLoading 
+    ? null 
+    : () => saveMovie(),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: state is AddMovieLoading 
+            ? Colors.grey 
+            : const Color(0xFFE53914),
+        padding: const EdgeInsets.symmetric(vertical: 14),
+      ),
+      child: state is AddMovieLoading
+          ? const SizedBox(
+              width: 20, 
+              height: 20, 
+              child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation(Colors.white))
+            )
+          : const Text(
+              "Add Movie",
+              style: TextStyle(color: Colors.white, fontSize: 16),
+            ),
+    );
+  },
+);
+
 }

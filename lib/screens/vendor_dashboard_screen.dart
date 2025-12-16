@@ -103,11 +103,27 @@ class VendorDashboardScreen extends StatelessWidget {
                       SizedBox(width: isSmallScreen ? 4 : 8),
                       ElevatedButton.icon(
                         onPressed: () async {
-                          await Navigator.push(
+                          // ✅ CHANGE THIS:
+                          final result = await Navigator.push(
                             context,
                             MaterialPageRoute(
-                                builder: (_) => const AddMovieScreen()),
+                              builder: (_) => const AddMovieScreen(),
+                            ),
                           );
+                          
+                          // ✅ ADD THIS: Show snackbar when returning from AddMovieScreen
+                      if (result == 'movie_added') {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: const Text('Movie added successfully!' , style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),),
+                            backgroundColor: const Color(0xFFE53914),
+                            duration: const Duration(seconds: 2),
+                            behavior: SnackBarBehavior.floating,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            margin: const EdgeInsets.only(top: 80, left: 16, right: 16), 
+                          ),
+                        );
+                      }
                         },
                         icon: Icon(
                           Icons.add,
@@ -142,56 +158,164 @@ class VendorDashboardScreen extends StatelessWidget {
           ),
         ),
       ),
-      body: BlocBuilder<MoviesCubit, MoviesState>(
-        builder: (context, state) {
-          if (state is MoviesLoading) {
-            return const Center(child: CircularProgressIndicator());
-          } else if (state is MoviesError) {
-            return Center(
-              child: Text(
-                state.message,
-                style: const TextStyle(color: Colors.white70),
+      body: BlocListener<MoviesCubit, MoviesState>(
+        listener: (context, state) {
+          if (state is MoviesError) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Row(
+                  children: [
+                    const SizedBox(width: 12),
+                    Expanded(child: Text('Delete failed: ${state.message}', style: const TextStyle(fontSize: 15))),
+                    IconButton(
+                      icon: const Icon(Icons.close, color: Colors.white),
+                      onPressed: () => ScaffoldMessenger.of(context).hideCurrentSnackBar(),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                    ),
+                  ],
+                ),
+                backgroundColor: Colors.red,
+                duration: const Duration(seconds: 3),
+                behavior: SnackBarBehavior.floating,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                margin: const EdgeInsets.only(top: 80, left: 16, right: 16),
               ),
             );
-          } else if (state is MoviesLoaded) {
-            final movies = state.movies;
-            if (movies.isEmpty) {
-              return const Center(
-                child: Text(
-                  "No movies yet",
-                  style: TextStyle(color: Colors.white70),
+          }
+        },
+        child: BlocBuilder<MoviesCubit, MoviesState>(
+          builder: (context, state) {
+            if (state is MoviesLoading) {
+              return const Center(child: CircularProgressIndicator(color: Color(0xFFE53935)));
+            } else if (state is MoviesError) {
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.error_outline, color: Colors.white70, size: 64),
+                    const SizedBox(height: 16),
+                    Text(
+                      state.message,
+                      style: const TextStyle(color: Colors.white70, fontSize: 16),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: () => context.read<MoviesCubit>().watchAll(),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFE53935),
+                      ),
+                      child: const Text('Retry', style: TextStyle(color: Colors.white)),
+                    ),
+                  ],
                 ),
               );
-            }
-            return ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: movies.length,
-              itemBuilder: (context, index) {
-                final movie = movies[index];
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 16),
-                  child: MovieCard(
-                    movie: movie,
-                    onView: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => BookingOverviewScreen(
-                            movieId: movie.id,
-                            movieModel: movie,
-                          ),
-                        ),
-                      );
-                    },
-                    onDelete: () =>
-                        context.read<MoviesCubit>().deleteMovie(movie.id),
+            } else if (state is MoviesLoaded) {
+              final movies = state.movies;
+              if (movies.isEmpty) {
+                return Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.movie_outlined, color: Colors.white70, size: 80),
+                      const SizedBox(height: 16),
+                      const Text(
+                        "No movies yet",
+                        style: TextStyle(color: Colors.white70, fontSize: 18),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        "Add your first movie to get started",
+                        style: TextStyle(color: Colors.white38, fontSize: 14),
+                      ),
+                    ],
                   ),
                 );
-              },
-            );
-          }
-          return const SizedBox.shrink();
-        },
+              }
+              return ListView.builder(
+                padding: const EdgeInsets.all(16),
+                itemCount: movies.length,
+                itemBuilder: (context, index) {
+                  final movie = movies[index];
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 16),
+                    child: MovieCard(
+                      movie: movie,
+                      onView: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => BookingOverviewScreen(
+                              movieId: movie.id,
+                              movieModel: movie,
+                            ),
+                          ),
+                        );
+                      },
+                      onDelete: () {
+                        // ✅ Delete SnackBar من فوق
+                        ScaffoldMessenger.of(context).clearSnackBars();
+                        
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Row(
+                              children: [
+                                const SizedBox(width: 12),
+                                Expanded(child: Text('Deleting "${movie.title}"...', style: const TextStyle(fontSize: 15))),
+                                IconButton(
+                                  icon: const Icon(Icons.close, color: Colors.white),
+                                  onPressed: () => ScaffoldMessenger.of(context).hideCurrentSnackBar(),
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(),
+                                ),
+                              ],
+                            ),
+                            backgroundColor: Colors.orange,
+                            duration: const Duration(seconds: 2),
+                            behavior: SnackBarBehavior.floating,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            margin: const EdgeInsets.only(top: 80, left: 16, right: 16),
+                          ),
+                        );
+                        
+                        context.read<MoviesCubit>().deleteMovie(movie.id);
+                        
+                        Future.delayed(const Duration(milliseconds: 1500), () {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).clearSnackBars();
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Row(
+                                  children: [
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Text(
+                                        '"${movie.title}" deleted successfully!',
+                                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                                      ),
+                                    ),
+                                    const Icon(Icons.check_circle, color: Colors.white),
+                                  ],
+                                ),
+                                backgroundColor: const Color(0xFFE53914),
+                                duration: const Duration(seconds: 2),
+                                behavior: SnackBarBehavior.floating,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                margin: const EdgeInsets.only(top: 80, left: 16, right: 16),
+                              ),
+                            );
+                          }
+                        });
+                      },
+                    ),
+                  );
+                },
+              );
+            }
+            return const SizedBox.shrink();
+          },
+        ),
       ),
     );
   }

@@ -23,60 +23,59 @@ class MoviesRepository {
   }
 
   Future<MovieModel> getMovieById(String movieId) async {
-  final doc = await _movies.doc(movieId).get();
-  if (!doc.exists) {
-    throw Exception("Movie not found");
+    final doc = await _movies.doc(movieId).get();
+    if (!doc.exists) {
+      throw Exception("Movie not found");
+    }
+    return MovieModel.fromDoc(doc);
   }
-  return MovieModel.fromDoc(doc);
-}
 
-Future<void> updateMovieModel(String id, MovieModel movie) async {
-  await FirebaseFirestore.instance
-      .collection("movies")
-      .doc(id)
-      .update(movie.toMap());
-}
+  Future<void> updateMovieModel(String id, MovieModel movie) async {
+    await FirebaseFirestore.instance
+        .collection("movies")
+        .doc(id)
+        .update(movie.toMap());
+  }
 
   Future<MovieModel> addMovie(MovieModel movie) async {
-  try {
-    final moviesRef = _firestore.collection('movies');
+    try {
+      final moviesRef = _firestore.collection('movies');
 
-    // 1️⃣ Save movie document (without ID)
-    final docRef = await moviesRef.add(movie.toMap());
+      // 1️⃣ Save movie document (without ID)
+      final docRef = await moviesRef.add(movie.toMap());
 
-    // 2️⃣ Update movie with ID
-    final savedMovie = movie.copyWith(id: docRef.id);
+      // 2️⃣ Update movie with ID
+      final savedMovie = movie.copyWith(id: docRef.id);
 
-    // 3️⃣ Create slots
-    final slotsRef = docRef.collection('slots');
+      // 3️⃣ Create slots
+      final slotsRef = docRef.collection('slots');
 
-    for (int i = 0; i < savedMovie.timeSlots.length; i++) {
-      final slotId = "slot_${i + 1}";
-      final slotLabel = savedMovie.timeSlots[i];
+      for (int i = 0; i < savedMovie.timeSlots.length; i++) {
+        final slotId = "slot_${i + 1}";
+        final slotLabel = savedMovie.timeSlots[i];
 
-      final slotDoc = slotsRef.doc(slotId);
+        final slotDoc = slotsRef.doc(slotId);
 
-      await slotDoc.set({
-        "label": slotLabel,
-        "createdAt": FieldValue.serverTimestamp(),
-      });
-
-      // 4️⃣ Create seats subcollection
-      final seatsRef = slotDoc.collection("seats");
-
-      for (int seat = 1; seat <= savedMovie.seats; seat++) {
-        await seatsRef.doc(seat.toString()).set({
-          "booked": false,
+        await slotDoc.set({
+          "label": slotLabel,
+          "createdAt": FieldValue.serverTimestamp(),
         });
+
+        // 4️⃣ Create seats subcollection
+        final seatsRef = slotDoc.collection("seats");
+
+        for (int seat = 1; seat <= savedMovie.seats; seat++) {
+          await seatsRef.doc(seat.toString()).set({
+            "booked": false,
+          });
+        }
       }
+
+      return savedMovie;
+    } catch (e) {
+      rethrow;
     }
-
-    return savedMovie;
-  } catch (e) {
-    rethrow;
   }
-}
-
 
   Future<void> _initSlotsAndSeats(String movieId, List<String> slots, int seats) async {
     final batch = _firestore.batch();
@@ -94,18 +93,33 @@ Future<void> updateMovieModel(String id, MovieModel movie) async {
     await batch.commit();
   }
 
-  // Delete movie + nested docs (small dataset approach)
+  // ✅ FIXED: Improved delete performance using batch operations
   Future<void> deleteMovie(String movieId) async {
+    final batch = _firestore.batch();
     final movieRef = _movies.doc(movieId);
+
+    // Get all slots
     final slotsSnap = await movieRef.collection('slots').get();
+
+    // Add all deletions to batch (movie, slots, and seats)
+    // Delete movie document
+    batch.delete(movieRef);
+
+    // Delete slots and their seats
     for (final slotDoc in slotsSnap.docs) {
       final seatsSnap = await slotDoc.reference.collection('seats').get();
-      for (final s in seatsSnap.docs) {
-        await s.reference.delete();
+      
+      // Delete all seats for this slot
+      for (final seatDoc in seatsSnap.docs) {
+        batch.delete(seatDoc.reference);
       }
-      await slotDoc.reference.delete();
+      
+      // Delete slot document
+      batch.delete(slotDoc.reference);
     }
-    await movieRef.delete();
+
+    // Execute batch (much faster than sequential deletes)
+    await batch.commit();
   }
 
   // Update movie (image optional)

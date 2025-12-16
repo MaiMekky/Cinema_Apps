@@ -87,8 +87,14 @@ Future<void> saveVendorToken() async {
 }
 
 void _handleNavigation(Map<String, dynamic> data) {
-  navigatorKey.currentState?.pushNamed('/notifications');
+  final bookingId = data['bookingId'];
+  if (bookingId != null && bookingId.isNotEmpty) {
+    navigatorKey.currentState?.pushNamed('/booking-details', arguments: bookingId);
+  } else {
+    navigatorKey.currentState?.pushNamed('/notifications');
+  }
 }
+
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -129,13 +135,17 @@ Future<void> main() async {
 
     const platformDetails = NotificationDetails(android: androidDetails);
 
-    await flutterLocalNotificationsPlugin.show(
-      DateTime.now().millisecondsSinceEpoch ~/ 1000,
-      title,
-      body,
-      platformDetails,
-      payload: jsonEncode(message.data),
-    );
+ await flutterLocalNotificationsPlugin.show(
+  DateTime.now().millisecondsSinceEpoch ~/ 1000,
+  title,
+  body,
+  platformDetails,
+  payload: jsonEncode({
+    ...message.data,
+    'bookingId': message.data['bookingId'] ?? '', // Ensure it's included
+  }),
+);
+
 
     await FirebaseFirestore.instance.collection('notifications').add({
       'title': title,
@@ -172,7 +182,6 @@ Future<void> main() async {
     ),
   );
 }
-
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
@@ -191,7 +200,30 @@ class MyApp extends StatelessWidget {
         '/notifications': (_) => const NotificationScreen(),
         '/booking-details': (context) {
           final args = ModalRoute.of(context)?.settings.arguments as String?;
-          return BookingDetailsScreen(bookingId: args ?? '');
+          if (args == null || args.isEmpty) {
+            return Scaffold(
+              backgroundColor: const Color(0xFF111B2B),
+              body: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.error, color: Colors.red, size: 64),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'No booking ID provided',
+                      style: TextStyle(color: Colors.white, fontSize: 18),
+                    ),
+                    const SizedBox(height: 8),
+                    ElevatedButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('Go Back'),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
+          return BookingDetailsScreen(bookingId: args);
         },
       },
     );

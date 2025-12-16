@@ -1,15 +1,12 @@
-// lib/screens/vendor_dashboard_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../cubit/movies/movies_cubit.dart';
 import '../cubit/movies/movies_state.dart';
-// import '../models/movie_model.dart';
 import '../widgets/movie_card.dart';
 import '../utils/app_colors.dart';
 import 'add_movie_screen.dart';
 import 'booking_overview_screen.dart';
-
 import 'notification_screen.dart';
 
 class VendorDashboardScreen extends StatelessWidget {
@@ -21,9 +18,8 @@ class VendorDashboardScreen extends StatelessWidget {
     final isSmallScreen = screenWidth < 380;
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: AppColors.background, // dark navy
       appBar: PreferredSize(
-        // ✅ FIX: Increased height to accommodate content
         preferredSize: Size.fromHeight(isSmallScreen ? 90 : 100),
         child: AppBar(
           automaticallyImplyLeading: false,
@@ -33,36 +29,41 @@ class VendorDashboardScreen extends StatelessWidget {
             child: Padding(
               padding: EdgeInsets.symmetric(
                 horizontal: isSmallScreen ? 12 : 16,
-                vertical: isSmallScreen ? 10 : 12, // ✅ FIX: Reduced vertical padding
+                vertical: isSmallScreen ? 10 : 12,
               ),
               child: Row(
                 children: [
+                  // Red circular icon like CineBook logo
                   Container(
-                    width: isSmallScreen ? 44 : 50, // ✅ FIX: Slightly smaller
-                    height: isSmallScreen ? 44 : 50, // ✅ FIX: Slightly smaller
-                    decoration: BoxDecoration(
-                      color: AppColors.primary,
+                    width: isSmallScreen ? 44 : 50,
+                    height: isSmallScreen ? 44 : 50,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFE53935), // primary red accent
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(Icons.movie, color: Colors.white, size: isSmallScreen ? 22 : 26),
+                    child: Icon(
+                      Icons.local_movies,
+                      color: Colors.white,
+                      size: isSmallScreen ? 22 : 26,
+                    ),
                   ),
                   SizedBox(width: isSmallScreen ? 10 : 14),
                   Expanded(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min, // ✅ FIX: Added to prevent column from expanding
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          "Vendor Dashboard",
+                          "CineBook Vendor",
                           style: TextStyle(
-                            color: AppColors.textPrimary,
-                            fontSize: isSmallScreen ? 15 : 18, // ✅ FIX: Slightly smaller font
-                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                            fontSize: isSmallScreen ? 15 : 18,
+                            fontWeight: FontWeight.w700,
                           ),
-                          overflow: TextOverflow.ellipsis, // ✅ FIX: Prevent text overflow
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        const SizedBox(height: 2), // ✅ FIX: Reduced spacing
+                        const SizedBox(height: 2),
                         BlocBuilder<MoviesCubit, MoviesState>(
                           builder: (context, state) {
                             int count = 0;
@@ -70,8 +71,8 @@ class VendorDashboardScreen extends StatelessWidget {
                             return Text(
                               "$count movies",
                               style: TextStyle(
-                                color: AppColors.textSecondary,
-                                fontSize: isSmallScreen ? 11 : 13, // ✅ FIX: Slightly smaller
+                                color: Colors.white70,
+                                fontSize: isSmallScreen ? 11 : 13,
                               ),
                             );
                           },
@@ -83,42 +84,53 @@ class VendorDashboardScreen extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       IconButton(
-                        icon: Icon(Icons.notifications_none, size: isSmallScreen ? 22 : 24),
-                        color: AppColors.textPrimary,
-                        padding: EdgeInsets.all(isSmallScreen ? 4 : 6), // ✅ FIX: Reduced padding
+                        icon: Icon(
+                          Icons.notifications_none,
+                          size: isSmallScreen ? 22 : 24,
+                        ),
+                        color: Colors.white,
+                        padding:
+                            EdgeInsets.all(isSmallScreen ? 4 : 6),
                         constraints: const BoxConstraints(),
                         onPressed: () async {
                           await Navigator.push(
                             context,
-                            MaterialPageRoute(builder: (_) => const NotificationScreen()),
+                            MaterialPageRoute(
+                                builder: (_) => const NotificationScreen()),
                           );
                         },
                       ),
                       SizedBox(width: isSmallScreen ? 4 : 8),
                       ElevatedButton.icon(
                         onPressed: () async {
-                          // open add screen
                           await Navigator.push(
                             context,
-                            MaterialPageRoute(builder: (_) => const AddMovieScreen()),
+                            MaterialPageRoute(
+                                builder: (_) => const AddMovieScreen()),
                           );
                         },
-                        icon: Icon(Icons.add, size: isSmallScreen ? 16 : 18, color: Colors.white),
+                        icon: Icon(
+                          Icons.add,
+                          size: isSmallScreen ? 16 : 18,
+                          color: Colors.white,
+                        ),
                         label: Text(
                           "Add",
                           style: TextStyle(
                             color: Colors.white,
-                            fontSize: isSmallScreen ? 13 : 14, // ✅ FIX: Slightly smaller
+                            fontSize: isSmallScreen ? 13 : 14,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary,
+                          backgroundColor: const Color(0xFFE53935), // red button like login
                           padding: EdgeInsets.symmetric(
-                            horizontal: isSmallScreen ? 14 : 20, // ✅ FIX: Reduced padding
-                            vertical: isSmallScreen ? 8 : 10, // ✅ FIX: Reduced padding
+                            horizontal: isSmallScreen ? 14 : 20,
+                            vertical: isSmallScreen ? 8 : 10,
                           ),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(30),
+                          ),
                           elevation: 0,
                         ),
                       ),
@@ -135,17 +147,29 @@ class VendorDashboardScreen extends StatelessWidget {
           if (state is MoviesLoading) {
             return const Center(child: CircularProgressIndicator());
           } else if (state is MoviesError) {
-            return Center(child: Text(state.message));
+            return Center(
+              child: Text(
+                state.message,
+                style: const TextStyle(color: Colors.white70),
+              ),
+            );
           } else if (state is MoviesLoaded) {
             final movies = state.movies;
-            if (movies.isEmpty) return const Center(child: Text("No movies yet"));
+            if (movies.isEmpty) {
+              return const Center(
+                child: Text(
+                  "No movies yet",
+                  style: TextStyle(color: Colors.white70),
+                ),
+              );
+            }
             return ListView.builder(
-              padding: const EdgeInsets.all(16), // ✅ Add padding around the list
+              padding: const EdgeInsets.all(16),
               itemCount: movies.length,
               itemBuilder: (context, index) {
                 final movie = movies[index];
                 return Padding(
-                  padding: const EdgeInsets.only(bottom: 16), // ✅ Space between cards
+                  padding: const EdgeInsets.only(bottom: 16),
                   child: MovieCard(
                     movie: movie,
                     onView: () {
@@ -159,7 +183,8 @@ class VendorDashboardScreen extends StatelessWidget {
                         ),
                       );
                     },
-                    onDelete: () => context.read<MoviesCubit>().deleteMovie(movie.id),
+                    onDelete: () =>
+                        context.read<MoviesCubit>().deleteMovie(movie.id),
                   ),
                 );
               },

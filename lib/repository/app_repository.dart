@@ -20,11 +20,11 @@ class AppRepository {
   // -------------------------
   // SCREENINGS (movie-specific)
   // -------------------------
-  Future<List<Map<String, dynamic>>> getScreenings(String movieId) async {
+ Future<List<Map<String, dynamic>>> getScreenings(String movieId) async {
     final snap = await firestore
         .collection("movies")
         .doc(movieId)
-        .collection("screenings")
+        .collection("slots") 
         .get();
 
     return snap.docs
@@ -32,21 +32,24 @@ class AppRepository {
         .toList();
   }
 
+
   // -------------------------
   // SEATS (real-time)
   // -------------------------
-  Stream<Map<String, dynamic>> listenToSeats(
-      String movieId, String screeningId) {
+  Stream<Map<String, dynamic>> listenToSeats(String movieId, String slotId) {
     return firestore
         .collection("movies")
         .doc(movieId)
-        .collection("screenings")
-        .doc(screeningId)
+        .collection("slots")
+        .doc(slotId)  
+        .collection("seats")
         .snapshots()
-        .map((doc) {
-      final data = doc.data();
-      return Map<String, dynamic>.from(data?["seats"] ?? {});
-    });
+        .map((snap) => {
+          "seats": snap.docs.map((doc) => {
+            "id": doc.id,
+            "booked": doc.data()["booked"] ?? false,
+          }).toList(),
+        });
   }
 
   // -------------------------

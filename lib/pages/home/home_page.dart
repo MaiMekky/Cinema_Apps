@@ -1,4 +1,3 @@
-// import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -16,62 +15,40 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  List<Movie> movies = [];
-  List<Movie> filtered = [];
   String userName = "User";
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
 
   @override
   void initState() {
     super.initState();
-    loadMovies();
     loadUserName();
-  }
-
-  Future<void> loadMovies() async {
-    final snapshot = await FirebaseFirestore.instance
-        .collection('movies')
-        .orderBy('createdAt', descending: true)
-        .get();
-
-    final loaded = snapshot.docs.map((doc) {
-      final data = doc.data();
-
-      return Movie(
-        id: doc.id,
-        title: data['title'] ?? '',
-        description: data['description'] ?? '',
-        duration: data['duration'] ?? 0,
-        seats: data['seats'] ?? 0,
-        imageBase64: data['imageBase64'] ?? '',
-        timeSlots: List<String>.from(data['timeSlots'] ?? []),
-        createdAt: (data['createdAt'] as Timestamp).toDate(),
-      );
-    }).toList();
-
-    setState(() {
-      movies = loaded;
-      filtered = loaded;
-    });
   }
 
   Future<void> loadUserName() async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
 
-    final data =
-        await FirebaseFirestore.instance.collection('users').doc(uid).get();
+    try {
+      final data = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .get();
 
-    setState(() {
-      userName = data.data()?['fullName'] ?? "User";
-    });
+      if (mounted) {
+        setState(() {
+          userName = data.data()?['fullName'] ?? "User";
+        });
+      }
+    } catch (e) {
+      debugPrint("Error loading user: $e");
+    }
   }
 
-  void search(String value) {
-    setState(() {
-      filtered = movies
-          .where((m) => m.title.toLowerCase().contains(value.toLowerCase()))
-          .toList();
-    });
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   @override
@@ -124,12 +101,13 @@ class _HomePageState extends State<HomePage> {
                         if (context.mounted) {
                           Navigator.of(context).pushAndRemoveUntil(
                             MaterialPageRoute(
-                                builder: (context) => const LoginPage()),
+                              builder: (context) => const LoginPage(),
+                            ),
                             (route) => false,
                           );
                         }
                       } catch (e) {
-                        print("Logout error: $e");
+                        debugPrint("Logout error: $e");
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(content: Text("Logout failed: $e")),
@@ -149,13 +127,17 @@ class _HomePageState extends State<HomePage> {
 
               // SEARCH BAR
               TextField(
-                onChanged: search,
+                controller: _searchController,
+                onChanged: (value) {
+                  setState(() {
+                    _searchQuery = value;
+                  });
+                },
                 style: const TextStyle(color: Colors.white),
                 decoration: InputDecoration(
                   filled: true,
                   fillColor: AppColors.card,
-                  prefixIcon:
-                      const Icon(Icons.search, color: AppColors.textSecondary),
+                  prefixIcon: const Icon(Icons.search, color: AppColors.textSecondary),
                   hintText: 'Search for movies...',
                   hintStyle: const TextStyle(color: AppColors.textSecondary),
                   border: OutlineInputBorder(
@@ -178,34 +160,112 @@ class _HomePageState extends State<HomePage> {
 
               const SizedBox(height: 10),
 
+              // ✅ REAL-TIME MOVIES STREAM
               Expanded(
-                child: filtered.isEmpty
-                    ? const Center(
+                child: StreamBuilder<QuerySnapshot>(
+                  stream: FirebaseFirestore.instance
+                      .collection('movies')
+                      .orderBy('createdAt', descending: true)
+                      .snapshots(),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(
+                        child: CircularProgressIndicator(color: Colors.red),
+                      );
+                    }
+
+                    if (snapshot.hasError) {
+                      return Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.error, color: Colors.red, size: 64),
+                            const SizedBox(height: 16),
+                            Text(
+                              'Error: ${snapshot.error}',
+                              style: const TextStyle(color: Colors.white54),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 16),
+                            ElevatedButton(
+                              onPressed: () => setState(() {}),
+                              child: const Text('Retry'),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+
+                    if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                      return const Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.movie_outlined, color: Colors.white54, size: 64),
+                            SizedBox(height: 16),
+                            Text(
+                              "No movies available",
+                              style: TextStyle(color: Colors.white54, fontSize: 18),
+                            ),
+                            SizedBox(height: 8),
+                            Text(
+                              "Check back soon for new releases",
+                              style: TextStyle(color: Colors.white38, fontSize: 14),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+
+                    // ✅ Real-time filter + search
+                    final allMovies = snapshot.data!.docs.map((doc) {
+                      final data = doc.data() as Map<String, dynamic>;
+                      return Movie(
+                        id: doc.id,
+                        title: data['title'] ?? '',
+                        description: data['description'] ?? '',
+                        duration: data['duration'] ?? 0,
+                        seats: data['seats'] ?? 0,
+                        imageBase64: data['imageBase64'] ?? '',
+                        timeSlots: List<String>.from(data['timeSlots'] ?? []),
+                        createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+                      );
+                    }).where((movie) => movie.title
+                        .toLowerCase()
+                        .contains(_searchQuery.toLowerCase()))
+                        .toList();
+
+                    if (allMovies.isEmpty) {
+                      return const Center(
                         child: Text(
-                          "No movies found",
+                          "No movies match your search",
                           style: TextStyle(color: Colors.white54),
                         ),
-                      )
-                    : ListView.builder(
-                        itemCount: filtered.length,
-                        itemBuilder: (context, index) {
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 10),
-                            child: MovieCard(
-                              movie: filtered[index],
-                              onBook: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) =>
-                                        BookingPage(movieId: filtered[index].id),
-                                  ),
-                                );
-                              },
-                            ),
-                          );
-                        },
-                      ),
+                      );
+                    }
+
+                    return ListView.builder(
+                      itemCount: allMovies.length,
+                      itemBuilder: (context, index) {
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 10),
+                          child: MovieCard(
+                            movie: allMovies[index],
+                            onBook: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) =>
+                                      BookingPage(movieId: allMovies[index].id),
+                                ),
+                              );
+                            },
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
               ),
             ],
           ),

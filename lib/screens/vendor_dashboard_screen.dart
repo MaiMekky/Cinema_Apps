@@ -114,14 +114,25 @@ class VendorDashboardScreen extends StatelessWidget {
                           // ✅ ADD THIS: Show snackbar when returning from AddMovieScreen
                       if (result == 'movie_added') {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: const Text('Movie added successfully!' , style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),),
-                            backgroundColor: const Color(0xFFE53914),
-                            duration: const Duration(seconds: 2),
-                            behavior: SnackBarBehavior.floating,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            margin: const EdgeInsets.only(top: 80, left: 16, right: 16), 
-                          ),
+                           SnackBar(
+                                content: Row(
+                                  children: [
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Text(
+                                        '"Movie added successfully!',
+                                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                                      ),
+                                    ),
+                                    const Icon(Icons.check_circle, color: Colors.white),
+                                  ],
+                                ),
+                                backgroundColor: const Color(0xFFE53914),
+                                duration: const Duration(seconds: 2),
+                                behavior: SnackBarBehavior.floating,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                margin: const EdgeInsets.only(top: 80, left: 16, right: 16),
+                              ),
                         );
                       }
                         },
@@ -254,7 +265,6 @@ class VendorDashboardScreen extends StatelessWidget {
                         );
                       },
                       onDelete: () {
-                        // ✅ Delete SnackBar من فوق
                         ScaffoldMessenger.of(context).clearSnackBars();
                         
                         ScaffoldMessenger.of(context).showSnackBar(

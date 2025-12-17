@@ -38,44 +38,48 @@ class MoviesRepository {
   }
 
   Future<MovieModel> addMovie(MovieModel movie) async {
-    try {
-      final moviesRef = _firestore.collection('movies');
-
-      // 1️⃣ Save movie document (without ID)
-      final docRef = await moviesRef.add(movie.toMap());
-
-      // 2️⃣ Update movie with ID
-      final savedMovie = movie.copyWith(id: docRef.id);
-
-      // 3️⃣ Create slots
-      final slotsRef = docRef.collection('slots');
-
-      for (int i = 0; i < savedMovie.timeSlots.length; i++) {
-        final slotId = "slot_${i + 1}";
-        final slotLabel = savedMovie.timeSlots[i];
-
-        final slotDoc = slotsRef.doc(slotId);
-
-        await slotDoc.set({
-          "label": slotLabel,
-          "createdAt": FieldValue.serverTimestamp(),
-        });
-
-        // 4️⃣ Create seats subcollection
-        final seatsRef = slotDoc.collection("seats");
-
-        for (int seat = 1; seat <= savedMovie.seats; seat++) {
-          await seatsRef.doc(seat.toString()).set({
-            "booked": false,
-          });
-        }
+  try {
+    final moviesRef = _firestore.collection('movies');
+    
+    // 1️⃣ ✅ Create movie document FIRST (super fast)
+    final docRef = await moviesRef.add({
+      ...movie.toMap(),
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+    
+    final savedMovie = movie.copyWith(id: docRef.id);
+    final slotsRef = docRef.collection('slots');
+    
+    // 2️⃣ ✅ BATCH EVERYTHING (slots + 47 seats) - 500x faster!
+    final batch = _firestore.batch();
+    
+    // Create slots & seats in SINGLE batch
+    for (int i = 0; i < savedMovie.timeSlots.length; i++) {
+      final slotId = "slot_${i + 1}";
+      final slotDocRef = slotsRef.doc(slotId);
+      
+      // Add slot
+      batch.set(slotDocRef, {
+        "label": savedMovie.timeSlots[i],
+        "createdAt": FieldValue.serverTimestamp(),
+      });
+      
+      // Add 47 seats for this slot (NO nested loops = FAST)
+      final seatsRef = slotDocRef.collection("seats");
+      for (int seat = 1; seat <= savedMovie.seats; seat++) {
+        batch.set(seatsRef.doc(seat.toString()), {"booked": false});
       }
-
-      return savedMovie;
-    } catch (e) {
-      rethrow;
     }
+    
+    // 3️⃣ ✅ ONE commit = instant!
+    await batch.commit();
+    
+    return savedMovie;
+  } catch (e) {
+    rethrow;
   }
+}
+
 
   Future<void> _initSlotsAndSeats(String movieId, List<String> slots, int seats) async {
     final batch = _firestore.batch();

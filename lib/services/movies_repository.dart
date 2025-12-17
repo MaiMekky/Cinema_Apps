@@ -37,43 +37,39 @@ class MoviesRepository {
         .update(movie.toMap());
   }
 
-  Future<MovieModel> addMovie(MovieModel movie) async {
+ Future<MovieModel> addMovie(MovieModel movie) async {
   try {
     final moviesRef = _firestore.collection('movies');
     
-    // 1️⃣ ✅ Create movie document FIRST (super fast)
+    // 1 Create movie document FIRST
     final docRef = await moviesRef.add({
       ...movie.toMap(),
       'createdAt': FieldValue.serverTimestamp(),
     });
     
     final savedMovie = movie.copyWith(id: docRef.id);
+    
+    // 2️ BATCH slots + seats
+    final batch = _firestore.batch();
     final slotsRef = docRef.collection('slots');
     
-    // 2️⃣ ✅ BATCH EVERYTHING (slots + 47 seats) - 500x faster!
-    final batch = _firestore.batch();
-    
-    // Create slots & seats in SINGLE batch
     for (int i = 0; i < savedMovie.timeSlots.length; i++) {
       final slotId = "slot_${i + 1}";
       final slotDocRef = slotsRef.doc(slotId);
       
-      // Add slot
       batch.set(slotDocRef, {
         "label": savedMovie.timeSlots[i],
         "createdAt": FieldValue.serverTimestamp(),
       });
       
-      // Add 47 seats for this slot (NO nested loops = FAST)
       final seatsRef = slotDocRef.collection("seats");
       for (int seat = 1; seat <= savedMovie.seats; seat++) {
         batch.set(seatsRef.doc(seat.toString()), {"booked": false});
       }
     }
     
-    // 3️⃣ ✅ ONE commit = instant!
     await batch.commit();
-    
+
     return savedMovie;
   } catch (e) {
     rethrow;
@@ -97,7 +93,7 @@ class MoviesRepository {
     await batch.commit();
   }
 
-  // ✅ FIXED: Improved delete performance using batch operations
+  //  FIXED: Improved delete performance using batch operations
   Future<void> deleteMovie(String movieId) async {
     final batch = _firestore.batch();
     final movieRef = _movies.doc(movieId);
